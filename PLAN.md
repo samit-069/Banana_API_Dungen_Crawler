@@ -7,8 +7,8 @@ reference all LLM/borrowed code, and make the code complex enough for 10 minutes
 
 ## 1. What the MVP already covers
 
-Working 6-floor RPG, Banana puzzles gating attack/skill/heal, mob/mid-boss/boss tiers, login with cookies,
-leaderboard, 17 tests. The gaps below are what move each theme from "describes it" to 70%+ ("critically evaluates alternatives").
+Dungeon with 3 floors and door-choice rooms (monster, treasure, campfire, merchant), floor bosses, Banana puzzles gating
+attack/skill/heal, mob/mid-boss/boss tiers, login with cookies, leaderboard, 21 tests. The gaps below are what move each theme from "describes it" to 70%+ ("critically evaluates alternatives").
 
 ## 2. Improvements per theme (aim for these in the video)
 
@@ -21,6 +21,7 @@ leaderboard, 17 tests. The gaps below are what move each theme from "describes i
 
 ## 3. Gameplay features to add (complexity for the video, in priority order)
 
+0. More dungeons: `DUNGEON` in `game.js` is plain data, so a second dungeon (different floors, monsters) is mostly data plus a dungeon-select screen.
 1. Hero classes (Warrior / Mage / Rogue) with different stats and skills, chosen at run start.
 2. Status effects (poison, stun, shield) and more enemy move types.
 3. More floors, random encounter order, a hard-mode with harder tiers (more puzzles, shorter timers).

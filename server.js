@@ -15,6 +15,8 @@ const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 const SESSION_TTL_MS = 60 * 60 * 1000;
 const MAX_FAILS = 5, LOCK_MS = 5 * 60 * 1000;
+// Avatars are an allow-list: the client can only pick one of these strings.
+const AVATARS = ['🧙', '🧝', '🧛', '🥷', '🦸', '🧑‍🚀', '🐸', '🍌', '👺', '🐉', '🦊', '🐼'];
 const MIME = { '.html': 'text/html; charset=utf-8', '.js': 'text/javascript; charset=utf-8',
                '.css': 'text/css; charset=utf-8', '.ico': 'image/x-icon' };
 
@@ -101,6 +103,16 @@ function newRun(username) {
   return run;
 }
 
+// Everything the dashboard / profile screens need, minus the password hash.
+function profileOf(username) {
+  const p = store.getPublic(username);
+  if (!p) return null;
+  p.rank = store.rankOf(username);
+  p.winRate = p.runs ? Math.round((p.wins / p.runs) * 100) : 0;
+  p.avatars = AVATARS;
+  return p;
+}
+
 // ---------- Routes: "METHOD /path" -> { auth, handler } ----------
 const routes = {
   'POST /api/register': { handler: async (ctx, res) => {
@@ -136,12 +148,34 @@ const routes = {
     send(res, 200, { ok: true });
   } },
 
-  'GET /api/me': { auth: true, handler: async (ctx, res) => {
-    const u = store.getUser(ctx.s.username);
-    send(res, 200, { username: u.username, bestScore: u.bestScore, bestFloor: u.bestFloor, wins: u.wins, runs: u.runs });
+  // Public, cheap probe used by the page-load handler: avoids a 401 in the console
+  // when a first-time visitor has no session yet.
+  'GET /api/session': { handler: async (ctx, res) => {
+    const sess = getSession(ctx.req);
+    send(res, 200, { username: sess ? sess.s.username : null });
   } },
 
-  'GET /api/leaderboard': { handler: async (ctx, res) => send(res, 200, store.leaderboard()) },
+  'GET /api/me': { auth: true, handler: async (ctx, res) => {
+    const p = profileOf(ctx.s.username);
+    if (!p) return send(res, 404, { error: 'User not found' });
+    send(res, 200, p);
+  } },
+
+  'GET /api/profile': { auth: true, handler: async (ctx, res) => {
+    const p = profileOf(ctx.s.username);
+    if (!p) return send(res, 404, { error: 'User not found' });
+    send(res, 200, p);
+  } },
+
+  'POST /api/profile/avatar': { auth: true, handler: async (ctx, res) => {
+    const avatar = ctx.body && ctx.body.avatar;
+    if (!AVATARS.includes(avatar)) return send(res, 400, { error: 'Choose one of the available avatars' });
+    const u = store.setAvatar(ctx.s.username, avatar);
+    if (!u) return send(res, 404, { error: 'User not found' });
+    send(res, 200, { avatar: u.avatar });
+  } },
+
+  'GET /api/leaderboard': { handler: async (ctx, res) => send(res, 200, store.leaderboard(10)) },
 
   'GET /api/run': { auth: true, handler: async (ctx, res) =>
     send(res, 200, { run: ctx.s.run ? game.view(ctx.s.run) : null }) },
@@ -177,9 +211,29 @@ const routes = {
     send(res, 200, { run: game.view(run) });
   } },
 
-  'POST /api/run/next': { auth: true, handler: async (ctx, res) => {
+  // Equipment: move an item between the bag and its slot. Free action, blocked mid-puzzle.
+  'POST /api/run/equip': { auth: true, handler: async (ctx, res) => {
     const run = requireRun(ctx);
-    game.nextFloor(run);
+    game.equipItem(run, ctx.body.itemId);
+    send(res, 200, { run: game.view(run) });
+  } },
+
+  'POST /api/run/unequip': { auth: true, handler: async (ctx, res) => {
+    const run = requireRun(ctx);
+    game.unequipItem(run, String(ctx.body.slot));
+    send(res, 200, { run: game.view(run) });
+  } },
+
+  // Dungeon navigation: pick one of the doors offered on the map, and leave a room when done.
+  'POST /api/run/door': { auth: true, handler: async (ctx, res) => {
+    const run = requireRun(ctx);
+    game.enterRoom(run, ctx.body.choice);
+    send(res, 200, { run: game.view(run) });
+  } },
+
+  'POST /api/run/leave': { auth: true, handler: async (ctx, res) => {
+    const run = requireRun(ctx);
+    game.leaveRoom(run);
     send(res, 200, { run: game.view(run) });
   } }
 };
@@ -205,7 +259,7 @@ async function handle(req, res) {
   try {
     const route = routes[`${req.method} ${pathname}`];
     if (route) {
-      const ctx = { body: req.method === 'POST' ? await readJson(req) : {} };
+      const ctx = { req, body: req.method === 'POST' ? await readJson(req) : {} };
       if (route.auth) {
         const sess = getSession(req);
         if (!sess) return send(res, 401, { error: 'Not logged in' });
