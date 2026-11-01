@@ -1,0 +1,12 @@
+{
+  "name": "banana-quest",
+  "version": "0.2.0",
+  "description": "CIS046-3: dungeon RPG where Banana API puzzles power every attack",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "test": "node --test"
+  },
+  "engines": { "node": ">=18" },
+  "dependencies": {}
+}

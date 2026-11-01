@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Banana Quest</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+<main>
+  <header>
+    <h1>🍌 Banana Quest</h1>
+    <div id="userbar" hidden>
+      <span id="who"></span>
+      <button id="logout-btn" class="ghost">Log out</button>
+    </div>
+  </header>
+
+  <!-- Login / register -->
+  <section id="auth-view" class="card">
+    <p class="muted">Solve Banana puzzles to power your attacks and conquer the dungeon.</p>
+    <form id="auth-form">
+      <input id="username" placeholder="Username" autocomplete="username" required>
+      <input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" required>
+      <div class="row">
+        <button type="submit">Log in</button>
+        <button type="button" id="register-btn" class="ghost">Register</button>
+      </div>
+    </form>
+  </section>
+
+  <!-- Title screen -->
+  <section id="menu-view" class="card" hidden>
+    <h2>Ready, adventurer?</h2>
+    <p id="record" class="muted"></p>
+    <button id="new-run-btn">Start new adventure</button>
+  </section>
+
+  <!-- Battle -->
+  <section id="battle-view" hidden>
+    <div class="card" id="enemy-card">
+      <div class="row between">
+        <strong id="floor"></strong>
+        <span id="tier" class="badge"></span>
+      </div>
+      <div id="enemy-emoji" aria-hidden="true"></div>
+      <h2 id="enemy-name"></h2>
+      <div class="bar"><div id="enemy-hp" class="fill hp"></div></div>
+      <p id="enemy-hp-text" class="muted"></p>
+      <p id="warning" class="warn" hidden>⚠ It is charging a HEAVY attack! Defend!</p>
+    </div>
+
+    <div class="card" id="hero-card">
+      <div class="row between"><strong id="hero-level"></strong><span id="hero-gold"></span></div>
+      <div class="stat"><span>HP</span><div class="bar"><div id="hero-hp" class="fill hp"></div></div><span id="hero-hp-text"></span></div>
+      <div class="stat"><span>MP</span><div class="bar"><div id="hero-mp" class="fill mp"></div></div><span id="hero-mp-text"></span></div>
+      <div class="stat"><span>XP</span><div class="bar"><div id="hero-xp" class="fill xp"></div></div><span id="hero-xp-text"></span></div>
+      <p class="muted" id="hero-extra"></p>
+    </div>
+
+    <!-- Puzzle panel (shown while an action needs puzzles) -->
+    <div class="card" id="puzzle-card" hidden>
+      <div class="row between"><strong id="puzzle-title"></strong><strong id="timer"></strong></div>
+      <div id="puzzles"></div>
+      <button id="submit-btn">Submit answers (Enter)</button>
+    </div>
+
+    <!-- Action buttons -->
+    <div id="actions" class="grid">
+      <button data-action="attack"></button>
+      <button data-action="skill"></button>
+      <button data-action="heal"></button>
+      <button data-action="defend"></button>
+      <button data-action="potion"></button>
+    </div>
+
+    <!-- Between fights -->
+    <div class="card" id="shop-card" hidden>
+      <h2>Victory! Rest and shop</h2>
+      <div class="row">
+        <button id="buy-btn" class="ghost"></button>
+        <button id="next-btn">Next floor →</button>
+      </div>
+    </div>
+
+    <!-- End of run -->
+    <div class="card" id="over-card" hidden>
+      <h2 id="over-title"></h2>
+      <p id="over-score"></p>
+      <button id="again-btn">Play again</button>
+    </div>
+
+    <div class="card">
+      <h3>Battle log</h3>
+      <ul id="log"></ul>
+    </div>
+  </section>
+
+  <p id="message" role="status"></p>
+
+  <aside class="card">
+    <h3>Leaderboard</h3>
+    <ol id="leaderboard"></ol>
+  </aside>
+</main>
+<script src="app.js"></script>
+</body>
+</html>
