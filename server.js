@@ -177,9 +177,16 @@ const routes = {
     send(res, 200, { run: game.view(run) });
   } },
 
-  'POST /api/run/next': { auth: true, handler: async (ctx, res) => {
+  // Dungeon navigation: pick one of the doors offered on the map, and leave a room when done.
+  'POST /api/run/door': { auth: true, handler: async (ctx, res) => {
     const run = requireRun(ctx);
-    game.nextFloor(run);
+    game.enterRoom(run, ctx.body.choice);
+    send(res, 200, { run: game.view(run) });
+  } },
+
+  'POST /api/run/leave': { auth: true, handler: async (ctx, res) => {
+    const run = requireRun(ctx);
+    game.leaveRoom(run);
     send(res, 200, { run: game.view(run) });
   } }
 };
