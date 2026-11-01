@@ -3,44 +3,205 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#0f0d17">
   <title>Banana Quest</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
-<main>
-  <header>
-    <h1>🍌 Banana Quest</h1>
-    <div id="userbar" hidden>
-      <span id="who"></span>
-      <button id="logout-btn" class="ghost">Log out</button>
+<header class="topbar">
+  <div class="topbar-inner">
+    <button type="button" class="brand" id="brand-home" aria-label="Banana Quest home">
+      <span class="brand-mark" aria-hidden="true">🍌</span>
+      <span>Banana <em>Quest</em></span>
+    </button>
+
+    <nav id="main-nav" class="main-nav" aria-label="Main" hidden>
+      <button type="button" class="nav-btn" data-nav="dashboard">Dashboard</button>
+      <button type="button" class="nav-btn" data-nav="leaderboard">Leaderboard</button>
+      <button type="button" class="nav-btn" data-nav="profile">Profile</button>
+    </nav>
+
+    <div id="userbar" class="userbar" hidden>
+      <button type="button" id="user-chip" class="user-chip" data-nav="profile" title="Open profile">
+        <span id="chip-avatar" class="avatar avatar-xs">🧙</span>
+        <span id="who">—</span>
+      </button>
+      <button type="button" id="logout-btn" class="ghost small">Log out</button>
     </div>
-  </header>
+  </div>
+</header>
 
-  <!-- Login / register -->
-  <section id="auth-view" class="card">
-    <p class="muted">Solve Banana puzzles to power your attacks and conquer the dungeon.</p>
-    <form id="auth-form">
-      <input id="username" placeholder="Username" autocomplete="username" required>
-      <input id="password" type="password" placeholder="Password (6+ characters)" autocomplete="current-password" required>
-      <div class="row">
-        <button type="submit">Log in</button>
-        <button type="button" id="register-btn" class="ghost">Register</button>
+<p id="message" role="status" aria-live="polite"></p>
+
+<main class="shell">
+  <!-- ============ AUTH ============ -->
+  <section id="auth-view" class="view auth-layout">
+    <div class="auth-hero">
+      <p class="eyebrow">A puzzle-powered dungeon crawler</p>
+      <h1>Turn banana puzzles into <span class="grad">damage.</span></h1>
+      <p class="lede">Every attack, spell and heal is gated by a real Banana API puzzle. Pick doors, fight bosses and climb the leaderboard — one digit at a time.</p>
+      <ul class="feature-list">
+        <li><span aria-hidden="true">🍌</span><div><strong>Puzzle combat</strong><small>Solve in time; accuracy becomes your damage.</small></div></li>
+        <li><span aria-hidden="true">⚔️</span><div><strong>Roguelike runs</strong><small>Doors, bosses, campfires and merchants.</small></div></li>
+        <li><span aria-hidden="true">🏆</span><div><strong>Persistent profile</strong><small>Scores, wins and a full run history.</small></div></li>
+        <li><span aria-hidden="true">🔐</span><div><strong>Server-side secrets</strong><small>Puzzle answers never reach the browser.</small></div></li>
+      </ul>
+    </div>
+
+    <div class="card auth-card">
+      <div class="tabs" role="tablist" aria-label="Authentication">
+        <button type="button" id="tab-login" class="tab is-active" role="tab" aria-selected="true">Log in</button>
+        <button type="button" id="tab-register" class="tab" role="tab" aria-selected="false">Register</button>
       </div>
-    </form>
+      <h2 id="auth-title">Welcome back</h2>
+      <p class="muted" id="auth-sub">Log in to continue your adventure.</p>
+      <form id="auth-form" class="auth-form" novalidate>
+        <label class="field">
+          <span>Username</span>
+          <input id="username" name="username" placeholder="3–20 letters, digits or _" autocomplete="username" maxlength="20" required>
+        </label>
+        <label class="field">
+          <span>Password</span>
+          <input id="password" name="password" type="password" placeholder="At least 6 characters" autocomplete="current-password" maxlength="100" required>
+        </label>
+        <label class="field" id="confirm-wrap" hidden>
+          <span>Confirm password</span>
+          <input id="confirm" name="confirm" type="password" placeholder="Repeat your password" autocomplete="new-password" maxlength="100">
+        </label>
+        <p id="auth-error" class="form-error" role="alert"></p>
+        <button type="submit" id="auth-submit" class="primary w-full">Log in</button>
+      </form>
+      <p class="muted tiny" id="auth-hint">No account yet? Choose <strong>Register</strong> above.</p>
+    </div>
   </section>
 
-  <!-- Title screen -->
-  <section id="menu-view" class="card" hidden>
-    <h2>Ready, adventurer?</h2>
-    <p id="record" class="muted"></p>
-    <button id="new-run-btn">Start new adventure</button>
+  <!-- ============ DASHBOARD ============ -->
+  <section id="dashboard-view" class="view" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Adventurer's hall</p>
+        <h1 id="dash-greeting">Welcome back</h1>
+        <p class="muted" id="dash-sub">Your next run is waiting.</p>
+      </div>
+      <div class="head-actions">
+        <button type="button" id="continue-run-btn" class="primary" hidden>Continue adventure →</button>
+        <button type="button" id="new-run-btn" class="primary">⚔️ Start new adventure</button>
+      </div>
+    </div>
+
+    <div class="dash-grid">
+      <aside class="card hero-card-lg">
+        <div class="avatar avatar-xl" id="dash-avatar">🧙</div>
+        <h2 id="dash-name">—</h2>
+        <p class="muted" id="dash-title-text">—</p>
+        <div class="rank-pill" id="dash-rank" hidden></div>
+        <button type="button" class="ghost w-full" data-nav="profile">View profile</button>
+      </aside>
+      <div class="stats-grid" id="dash-stats"></div>
+    </div>
+
+    <div class="two-col">
+      <section class="card">
+        <div class="card-head">
+          <h3>Recent runs</h3>
+          <button type="button" class="link" data-nav="profile">History →</button>
+        </div>
+        <ul id="recent-runs" class="run-list"></ul>
+      </section>
+
+      <section class="card">
+        <div class="card-head">
+          <h3>Top adventurers</h3>
+          <button type="button" class="link" data-nav="leaderboard">View all →</button>
+        </div>
+        <ol id="dash-leaderboard" class="lb-list"></ol>
+      </section>
+    </div>
   </section>
 
-  <!-- Battle -->
-  <section id="battle-view" hidden>
+  <!-- ============ LEADERBOARD ============ -->
+  <section id="leaderboard-view" class="view" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Hall of fame</p>
+        <h1>Leaderboard</h1>
+        <p class="muted">Ranked by best score. Ties go to more wins, then rooms cleared.</p>
+      </div>
+      <span class="pill" id="lb-count"></span>
+    </div>
+
+    <section class="card lb-card">
+      <div class="lb-row lb-head" aria-hidden="true">
+        <span>#</span>
+        <span>Adventurer</span>
+        <span class="num">Score</span>
+        <span class="num lb-hide-sm">Wins</span>
+        <span class="num lb-hide-sm">Rooms</span>
+        <span class="num lb-hide-sm">Runs</span>
+      </div>
+      <div id="leaderboard-rows"></div>
+    </section>
+  </section>
+
+  <!-- ============ PROFILE ============ -->
+  <section id="profile-view" class="view" hidden>
+    <div class="page-head">
+      <div>
+        <p class="eyebrow">Account</p>
+        <h1>Your profile</h1>
+        <p class="muted" id="profile-sub">Everything you have achieved so far.</p>
+      </div>
+    </div>
+
+    <div class="profile-grid">
+      <aside class="card profile-card">
+        <div class="avatar avatar-xl" id="profile-avatar">🧙</div>
+        <h2 id="profile-name">—</h2>
+        <p class="muted" id="profile-joined"></p>
+        <div class="rank-pill" id="profile-rank" hidden></div>
+        <div class="avatar-picker-wrap">
+          <p class="label">Choose your avatar</p>
+          <div id="avatar-picker" class="avatar-picker"></div>
+        </div>
+      </aside>
+
+      <section class="card">
+        <div class="card-head"><h3>Career stats</h3></div>
+        <div class="stats-grid stats-grid-sm" id="profile-stats"></div>
+      </section>
+    </div>
+
+    <section class="card">
+      <div class="card-head">
+        <h3>Run history</h3>
+        <span class="muted" id="history-count"></span>
+      </div>
+      <div id="profile-history" class="history"></div>
+    </section>
+  </section>
+
+  <!-- ============ GAME ============ -->
+  <section id="battle-view" class="view battle" hidden>
+    <div class="battle-top card">
+      <div class="row between">
+        <button type="button" id="battle-home-btn" class="ghost small">← Hall</button>
+        <div class="battle-loc">
+          <strong id="floor"></strong>
+          <span id="room-step" class="muted"></span>
+        </div>
+      </div>
+      <div id="progress" aria-hidden="true"></div>
+    </div>
+
+    <div class="card" id="map-card" hidden>
+      <h2>Choose a door</h2>
+      <p class="muted">One door always leads to a fight. The other could be treasure, a campfire or a merchant.</p>
+      <div id="doors" class="grid"></div>
+    </div>
+
     <div class="card" id="enemy-card">
       <div class="row between">
-        <strong id="floor"></strong>
+        <span class="eyebrow">Enemy</span>
         <span id="tier" class="badge"></span>
       </div>
       <div id="enemy-emoji" aria-hidden="true"></div>
@@ -58,51 +219,49 @@
       <p class="muted" id="hero-extra"></p>
     </div>
 
-    <!-- Puzzle panel (shown while an action needs puzzles) -->
     <div class="card" id="puzzle-card" hidden>
       <div class="row between"><strong id="puzzle-title"></strong><strong id="timer"></strong></div>
       <div id="puzzles"></div>
-      <button id="submit-btn">Submit answers (Enter)</button>
+      <button type="button" id="submit-btn">Submit answers (Enter)</button>
     </div>
 
-    <!-- Action buttons -->
     <div id="actions" class="grid">
-      <button data-action="attack"></button>
-      <button data-action="skill"></button>
-      <button data-action="heal"></button>
-      <button data-action="defend"></button>
-      <button data-action="potion"></button>
+      <button type="button" data-action="attack"></button>
+      <button type="button" data-action="skill"></button>
+      <button type="button" data-action="heal"></button>
+      <button type="button" data-action="defend"></button>
+      <button type="button" data-action="potion"></button>
     </div>
 
-    <!-- Between fights -->
     <div class="card" id="shop-card" hidden>
-      <h2>Victory! Rest and shop</h2>
+      <h2>🛒 Travelling merchant</h2>
       <div class="row">
-        <button id="buy-btn" class="ghost"></button>
-        <button id="next-btn">Next floor →</button>
+        <button type="button" id="buy-btn" class="ghost"></button>
+        <button type="button" id="leave-btn">Leave shop →</button>
       </div>
     </div>
 
-    <!-- End of run -->
+    <div class="card" id="event-card" hidden>
+      <h2 id="event-title"></h2>
+      <button type="button" id="continue-btn">Continue →</button>
+    </div>
+
     <div class="card" id="over-card" hidden>
       <h2 id="over-title"></h2>
       <p id="over-score"></p>
-      <button id="again-btn">Play again</button>
+      <div class="row">
+        <button type="button" id="again-btn">Play again</button>
+        <button type="button" id="over-home-btn" class="ghost">Back to hall</button>
+      </div>
     </div>
 
     <div class="card">
       <h3>Battle log</h3>
-      <ul id="log"></ul>
+      <ul id="log" aria-live="polite"></ul>
     </div>
   </section>
-
-  <p id="message" role="status"></p>
-
-  <aside class="card">
-    <h3>Leaderboard</h3>
-    <ol id="leaderboard"></ol>
-  </aside>
 </main>
+
 <script src="app.js"></script>
 </body>
 </html>
