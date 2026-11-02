@@ -46,13 +46,41 @@ function render() {
   if (!inRun) return;
   const h = run.hero, e = run.enemy, pending = !!run.pending || !$('puzzle-card').hidden;
 
-  $('floor').textContent = `Floor ${run.floor} / ${run.totalFloors}`;
-  $('tier').textContent = e.tierLabel; $('tier').className = 'badge ' + e.tier;
-  $('enemy-emoji').textContent = e.emoji;
-  $('enemy-name').textContent = e.name;
-  $('enemy-hp').style.width = pct(e.hp, e.maxHp);
-  $('enemy-hp-text').textContent = `${e.hp} / ${e.maxHp} HP`;
-  show('warning', run.phase === 'combat' && e.nextMove === 'heavy');
+  // Dungeon progress: floor name + a dot per room (filled = done, ring = current)
+  $('floor').textContent = `${run.map.floorName} (floor ${run.floor}/${run.totalFloors})`;
+  $('room-step').textContent = `Room ${run.map.step} / ${run.map.totalSteps}`;
+  const prog = $('progress'); prog.textContent = '';
+  for (let i = 1; i <= run.map.totalSteps; i++) {
+    prog.textContent += i < run.map.step ? '● ' : i === run.map.step ? '◉ ' : '○ ';
+  }
+
+  // Door choice between rooms
+  show('map-card', run.phase === 'map');
+  const doors = $('doors'); doors.textContent = '';
+  (run.map.doors || []).forEach((d, i) => {
+    const b = document.createElement('button');
+    b.className = 'door ghost'; b.disabled = busy;
+    const title = document.createElement('strong');
+    title.textContent = `${i + 1}. ${d.icon} ${d.label}`;
+    b.appendChild(title);
+    if (d.enemy) {
+      const sub = document.createElement('span');
+      sub.textContent = `${d.enemy.emoji} ${d.enemy.name} (${d.enemy.tierLabel})`;
+      b.appendChild(sub);
+    }
+    b.addEventListener('click', () => chooseDoor(i));          // EVENT: click on a door
+    doors.appendChild(b);
+  });
+
+  show('enemy-card', !!e);
+  if (e) {
+    $('tier').textContent = e.tierLabel; $('tier').className = 'badge ' + e.tier;
+    $('enemy-emoji').textContent = e.hp > 0 ? e.emoji : '💨';
+    $('enemy-name').textContent = e.name;
+    $('enemy-hp').style.width = pct(e.hp, e.maxHp);
+    $('enemy-hp-text').textContent = `${e.hp} / ${e.maxHp} HP`;
+  }
+  show('warning', !!e && run.phase === 'combat' && e.nextMove === 'heavy');
 
   $('hero-level').textContent = `Hero Lv ${h.level}  (ATK ${h.atk}, DEF ${h.def})`;
   $('hero-gold').textContent = `🪙 ${h.gold}   🧪 ${h.potions}`;
@@ -75,7 +103,14 @@ function render() {
   show('shop-card', run.phase === 'shop');
   $('buy-btn').textContent = `Buy potion (${run.potionPrice} 🪙)`;
   $('buy-btn').disabled = busy || h.gold < run.potionPrice;
-  $('next-btn').disabled = busy;
+  $('leave-btn').disabled = busy;
+
+  show('event-card', run.phase === 'event');
+  if (run.phase === 'event') {
+    $('event-title').textContent = run.room && run.room.type === 'treasure' ? '💰 Treasure!'
+      : run.room && run.room.type === 'rest' ? '🔥 Campfire' : '✅ Room cleared';
+  }
+  $('continue-btn').disabled = busy;
 
   show('over-card', run.phase === 'over');
   if (run.phase === 'over') {
@@ -196,7 +231,14 @@ document.querySelectorAll('#actions button').forEach(b => b.addEventListener('cl
 }));
 
 $('buy-btn').addEventListener('click', () => guarded(async () => { run = (await api('/api/run/shop', 'POST', {})).run; }));
-$('next-btn').addEventListener('click', () => guarded(async () => { run = (await api('/api/run/next', 'POST', {})).run; setMessage(''); }));
+function chooseDoor(choice) {
+  guarded(async () => { setMessage(''); run = (await api('/api/run/door', 'POST', { choice })).run; });
+}
+function leaveRoom() {
+  guarded(async () => { setMessage(''); run = (await api('/api/run/leave', 'POST', {})).run; });
+}
+$('leave-btn').addEventListener('click', leaveRoom);       // leave the merchant
+$('continue-btn').addEventListener('click', leaveRoom);    // leave a cleared room / treasure / campfire
 
 // Keyboard events: digits fill the next empty puzzle slot; Enter submits; A/S/H/D/P pick actions.
 document.addEventListener('keydown', e => {
@@ -206,6 +248,8 @@ document.addEventListener('keydown', e => {
     else if (e.key === 'Enter') submitAnswers();
     return;
   }
+  if (run && run.phase === 'map' && /^[1-2]$/.test(e.key)) return chooseDoor(Number(e.key) - 1);     // 1/2 = doors
+  if (run && (run.phase === 'event' || run.phase === 'shop') && e.key === 'Enter') return leaveRoom();
   const map = { a: 'attack', s: 'skill', h: 'heal', d: 'defend', p: 'potion' };
   const btn = map[e.key.toLowerCase()] && document.querySelector(`#actions button[data-action="${map[e.key.toLowerCase()]}"]`);
   if (btn && !btn.disabled && !$('actions').hidden) btn.click();

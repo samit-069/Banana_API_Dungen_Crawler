@@ -38,9 +38,23 @@
 
   <!-- Battle -->
   <section id="battle-view" hidden>
-    <div class="card" id="enemy-card">
+    <div class="card" id="floor-card">
       <div class="row between">
         <strong id="floor"></strong>
+        <span id="room-step" class="muted"></span>
+      </div>
+      <div id="progress" aria-hidden="true"></div>
+    </div>
+
+    <!-- Door choice (shown between rooms) -->
+    <div class="card" id="map-card" hidden>
+      <h2>Choose a door</h2>
+      <div id="doors" class="grid"></div>
+    </div>
+
+    <div class="card" id="enemy-card">
+      <div class="row between">
+        <span></span>
         <span id="tier" class="badge"></span>
       </div>
       <div id="enemy-emoji" aria-hidden="true"></div>
@@ -76,11 +90,17 @@
 
     <!-- Between fights -->
     <div class="card" id="shop-card" hidden>
-      <h2>Victory! Rest and shop</h2>
+      <h2>🛒 Travelling merchant</h2>
       <div class="row">
         <button id="buy-btn" class="ghost"></button>
-        <button id="next-btn">Next floor →</button>
+        <button id="leave-btn">Leave shop →</button>
       </div>
+    </div>
+
+    <!-- Room finished (cleared / treasure / campfire) -->
+    <div class="card" id="event-card" hidden>
+      <h2 id="event-title"></h2>
+      <button id="continue-btn">Continue →</button>
     </div>
 
     <!-- End of run -->

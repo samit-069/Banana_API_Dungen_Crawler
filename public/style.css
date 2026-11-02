@@ -33,3 +33,12 @@ button:focus-visible, input:focus-visible { outline:3px solid #fff; outline-offs
 #log { list-style:none; margin:0; padding:0; max-height:200px; overflow:auto; font-size:.95rem; } #log li { padding:3px 0; border-bottom:1px solid #fff1; }
 #message { min-height:1.4em; text-align:center; font-weight:600; } #message.error { color:var(--hp); } #message.ok { color:var(--xp); }
 @media (max-width:420px) { .digits { grid-template-columns:repeat(5,1fr); } }
+/* dungeon map */
+#progress { letter-spacing:.2em; font-size:1.2rem; margin-top:4px; }
+button.door { display:flex; flex-direction:column; gap:4px; align-items:flex-start; text-align:left; padding:14px; }
+button.door span { font-weight:400; color:var(--muted); }
+#doors { grid-template-columns:repeat(2,1fr); } #doors button:last-child { grid-column:auto; }
+#doors button:only-child { grid-column:span 2; }
+
+/* make the hidden attribute win over display:grid / flex rules */
+[hidden] { display:none !important; }

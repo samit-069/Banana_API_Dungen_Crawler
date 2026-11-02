@@ -10,15 +10,19 @@ Needs **Node.js 18+** only. There are **no npm dependencies**, so no `npm instal
 
 ```bash
 node server.js      # or: npm start      -> http://localhost:3000
-npm test            # 17 tests, uses a fake Banana API, works offline
+npm test            # 21 tests, uses a fake Banana API, works offline
 ```
 
 Optional env vars: `PORT` (3000), `BANANA_API` (override API URL), `DATA_DIR` (where users.json is stored).
 
 ## How to play
 
-Register, then start an adventure: 6 floors (3 mobs, a mid-boss, a mob, the final boss).
-Each turn you pick an action; puzzle actions show Banana puzzle images and a countdown.
+Register, then start an adventure in **The Banana Crypt**: 3 floors, each made of 3 rooms plus a floor boss.
+Between rooms you choose one of two doors. A fight is always on offer; the other door may be another fight,
+💰 treasure, 🔥 a campfire (heals you) or 🛒 a merchant (buys potions). Doors show what is behind them, so you
+decide when to fight for XP and when to heal. Floor 1 ends with a mid-boss, floor 2 with a mid-boss, floor 3 with the dragon.
+Each combat turn you pick an action; puzzle actions show Banana puzzle images and a countdown.
+Keyboard: 1/2 choose a door, Enter continues.
 
 | Action | Cost | Effect |
 | --- | --- | --- |
@@ -38,14 +42,14 @@ Each turn you pick an action; puzzle actions show Banana puzzle images and a cou
 | Boss | 3 | 12 s |
 
 Other mechanics: partial credit (2 of 3 correct = 2/3 damage), combo bonus (+10% per consecutive perfect turn, max +50%),
-bosses telegraph a **heavy attack every 3rd turn** (warning shown, so Defend), XP/levels, gold, shop between floors.
+bosses telegraph a **heavy attack every 3rd turn** (warning shown, so Defend), XP/levels, gold, a small heal when you descend a floor.
 Keyboard: A/S/H/D/P pick actions, 0-9 answer puzzles, Enter submits.
 
 ## Files
 
 | File | Role |
 | --- | --- |
-| `game.js` | RPG engine: rules, enemies, turn logic. No I/O, emits events, fully unit-tested |
+| `game.js` | RPG engine: dungeon/floor/room generation, combat rules, bestiary data. No I/O, emits events, fully unit-tested |
 | `banana.js` | Client for the Banana API (the interoperability layer) |
 | `server.js` | HTTP server (Node built-ins only): routes, auth, sessions, static files |
 | `store.js` | JSON-file user + score storage (MVP) |
