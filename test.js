@@ -334,7 +334,6 @@ test('equipment changes are rejected for bad ids/slots and while a puzzle is pen
   run.phase = 'over';
   assert.throws(() => game.unequipItem(run, 'weapon'), /run is over/);
 });
-
 // ---------- HTTP integration tests ----------
 let base, server, cookie = '';
 
