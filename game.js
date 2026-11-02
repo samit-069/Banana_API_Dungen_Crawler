@@ -87,7 +87,7 @@ function createRun(username, rng = Math.random) {
   const run = {
     username, rng,
     events: new EventEmitter(),
-    log: [], phase: 'map', won: false,
+    log: [], phase: 'map', won: false, startedAt: Date.now(),
     floorIdx: 0, step: 0, map: [], room: null,
     cleared: 0, goldEarned: 0, combo: 0, busy: false, pending: null, recorded: false,
     hero: { level: 1, xp: 0, maxHp: 60, hp: 60, maxMp: 20, mp: 20, atk: 12, def: 2, gold: 0, potions: 1, defending: false },
@@ -328,7 +328,11 @@ function scoreOf(run) {
 }
 
 function finish(run) {
-  run.events.emit('runOver', { score: scoreOf(run), cleared: run.cleared, won: run.won });
+  run.events.emit('runOver', {
+    score: scoreOf(run), cleared: run.cleared, won: run.won,
+    gold: run.goldEarned, level: run.hero.level, floor: run.floorIdx + 1,
+    durationMs: Date.now() - run.startedAt
+  });
 }
 
 // ---------- Merchant ----------

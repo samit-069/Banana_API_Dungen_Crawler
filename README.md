@@ -10,7 +10,7 @@ Needs **Node.js 18+** only. There are **no npm dependencies**, so no `npm instal
 
 ```bash
 node server.js      # or: npm start      -> http://localhost:3000
-npm test            # 21 tests, uses a fake Banana API, works offline
+npm test            # 22 tests, uses a fake Banana API, works offline
 ```
 
 Optional env vars: `PORT` (3000), `BANANA_API` (override API URL), `DATA_DIR` (where users.json is stored).
@@ -23,6 +23,13 @@ Between rooms you choose one of two doors. A fight is always on offer; the other
 decide when to fight for XP and when to heal. Floor 1 ends with a mid-boss, floor 2 with a mid-boss, floor 3 with the dragon.
 Each combat turn you pick an action; puzzle actions show Banana puzzle images and a countdown.
 Keyboard: 1/2 choose a door, Enter continues.
+
+**Screens.** After logging in you land on the **dashboard**: avatar, title, six career stats (best score, wins,
+runs, rooms cleared, lifetime gold, global rank), your last four runs and a top-five leaderboard. The
+**leaderboard** page ranks all players by best score (ties broken by wins, then rooms cleared). The **profile**
+page shows your career stats, full run history (score, floor, gold, duration) and an avatar picker. Both the
+dashboard and profile are built from the same `/api/me` / `/api/profile` payload, so the server stays the only
+source of truth. An unfinished run is offered as **Continue adventure** rather than being silently replaced.
 
 | Action | Cost | Effect |
 | --- | --- | --- |
@@ -52,9 +59,25 @@ Keyboard: A/S/H/D/P pick actions, 0-9 answer puzzles, Enter submits.
 | `game.js` | RPG engine: dungeon/floor/room generation, combat rules, bestiary data. No I/O, emits events, fully unit-tested |
 | `banana.js` | Client for the Banana API (the interoperability layer) |
 | `server.js` | HTTP server (Node built-ins only): routes, auth, sessions, static files |
-| `store.js` | JSON-file user + score storage (MVP) |
+| `store.js` | JSON-file user profiles, run history and score storage (MVP) |
 | `public/` | Browser UI (`index.html`, `app.js`, `style.css`) |
 | `test.js` | Engine unit tests + HTTP integration tests |
+
+## HTTP API
+
+| Method + path | Auth | Purpose |
+| --- | --- | --- |
+| `POST /api/register` / `POST /api/login` | no | Create an account / start a session cookie |
+| `POST /api/logout` | yes | Delete the session and expire the cookie |
+| `GET /api/session` | no | Cheap probe: `{ username }` or `{ username: null }` for the page-load handler |
+| `GET /api/me` / `GET /api/profile` | yes | Profile, career stats, rank and last 10 runs (no password hash) |
+| `POST /api/profile/avatar` | yes | Choose an avatar from the server-side allow-list |
+| `GET /api/leaderboard` | no | Top 10 players with rank, avatar, score, wins, rooms, runs |
+| `GET /api/run` / `POST /api/run/new` | yes | Read the current run / start a fresh one |
+| `POST /api/run/action` | yes | Pick a combat action; returns puzzle images (never solutions) |
+| `POST /api/run/answer` | yes | Submit digits; the server checks answers and the deadline |
+| `POST /api/run/door` / `POST /api/run/leave` | yes | Navigate the dungeon / leave a cleared room or shop |
+| `POST /api/run/shop` | yes | Buy a potion from the merchant |
 
 ## The four video themes in this code
 

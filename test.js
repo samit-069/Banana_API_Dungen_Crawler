@@ -275,6 +275,9 @@ test.after(() => {
 });
 
 test('http: protected routes reject anonymous users; static page is served with CSP', async () => {
+  const sess = await call('/api/session');
+  assert.strictEqual(sess.status, 200);
+  assert.strictEqual(sess.body.username, null);
   assert.strictEqual((await call('/api/run')).status, 401);
   const page = await fetch(base + '/');
   assert.strictEqual(page.status, 200);
@@ -357,4 +360,27 @@ test('http: finished run is saved to the leaderboard once; logout kills the sess
   assert.strictEqual(me.runs, 1);
   await call('/api/logout', 'POST');
   assert.strictEqual((await call('/api/me')).status, 401);
+});
+
+test('http: profile exposes history and stats without the password; avatar changes are validated', async () => {
+  assert.strictEqual((await call('/api/login', 'POST', { username: 'hero2', password: 'secret2' })).status, 200);
+  const p = await call('/api/profile');
+  assert.strictEqual(p.status, 200);
+  assert.strictEqual(p.body.username, 'hero2');
+  assert.ok(Array.isArray(p.body.history));
+  assert.ok(p.body.history.length >= 1);                         // the previous test recorded a run
+  assert.strictEqual(p.body.history[0].score, 10);               // died in the first room: 0*100 + 0 gold + level 1*10
+  assert.ok(p.body.avatars.includes(p.body.avatar));
+  assert.ok(!JSON.stringify(p.body).includes('password'));
+  assert.ok(!JSON.stringify(p.body).includes('hash'));
+
+  assert.strictEqual((await call('/api/profile/avatar', 'POST', { avatar: '🍌' })).status, 200);
+  assert.strictEqual((await call('/api/me')).body.avatar, '🍌');
+  assert.strictEqual((await call('/api/profile/avatar', 'POST', { avatar: '<script>' })).status, 400);
+
+  const lb = (await call('/api/leaderboard')).body;
+  assert.ok(lb.length >= 1);
+  assert.strictEqual(lb[0].rank, 1);
+  assert.ok(lb[0].avatar);
+  assert.ok('bestFloor' in lb[0] && 'runs' in lb[0]);
 });
