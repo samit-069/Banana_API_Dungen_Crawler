@@ -184,13 +184,26 @@
   <section id="battle-view" class="view battle" hidden>
     <div class="battle-top card">
       <div class="row between">
-        <button type="button" id="battle-home-btn" class="ghost small">← Hall</button>
+        <div class="row">
+          <button type="button" id="battle-home-btn" class="ghost small">← Hall</button>
+          <button type="button" id="bag-btn" class="ghost small" aria-expanded="false">🎒 Bag</button>
+        </div>
         <div class="battle-loc">
           <strong id="floor"></strong>
           <span id="room-step" class="muted"></span>
         </div>
       </div>
       <div id="progress" aria-hidden="true"></div>
+    </div>
+
+    <div class="card" id="equip-card" hidden>
+      <div class="card-head">
+        <h3>🎒 Equipment</h3>
+        <span class="muted tiny">Click a slot to unequip · click a bag item to equip</span>
+      </div>
+      <div id="equip-slots" class="equip-slots"></div>
+      <p class="label bag-label">Bag</p>
+      <ul id="bag-list" class="bag-list"></ul>
     </div>
 
     <div class="card" id="map-card" hidden>
@@ -217,6 +230,7 @@
       <div class="stat"><span>MP</span><div class="bar"><div id="hero-mp" class="fill mp"></div></div><span id="hero-mp-text"></span></div>
       <div class="stat"><span>XP</span><div class="bar"><div id="hero-xp" class="fill xp"></div></div><span id="hero-xp-text"></span></div>
       <p class="muted" id="hero-extra"></p>
+      <p class="muted tiny" id="hero-gear"></p>
     </div>
 
     <div class="card" id="puzzle-card" hidden>

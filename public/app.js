@@ -20,6 +20,7 @@ let busy = false;          // blocks double clicks while a request is in flight
 let currentView = 'auth';
 let authMode = 'login';
 let messageTimer = null;
+let bagOpen = false;        // equipment panel visibility during a run
 
 // ---------- Small helpers ----------
 function el(tag, className, text) {
@@ -440,6 +441,10 @@ function render() {
   $('hero-mp').style.width = pct(h.mp, h.maxMp); $('hero-mp-text').textContent = `${h.mp}/${h.maxMp}`;
   $('hero-xp').style.width = pct(h.xp, h.xpToNext); $('hero-xp-text').textContent = `${h.xp}/${h.xpToNext}`;
   $('hero-extra').textContent = `Combo x${run.combo} (+${Math.min(run.combo, 5) * 10}% damage)` + (h.defending ? ' · Defending' : '');
+  const bonus = h.bonus || {};
+  const gear = [['atk', 'ATK'], ['def', 'DEF'], ['maxHp', 'HP'], ['maxMp', 'MP']]
+    .filter(([k]) => bonus[k]).map(([k, label]) => `+${bonus[k]} ${label}`);
+  $('hero-gear').textContent = gear.length ? `Gear bonus: ${gear.join(', ')}` : 'Gear bonus: none equipped';
 
   const combat = run.phase === 'combat';
   show('actions', combat);
@@ -472,6 +477,79 @@ function render() {
 
   const log = $('log'); log.innerHTML = '';
   (run.log || []).forEach(line => log.appendChild(el('li', '', line)));
+
+  renderEquipment(run);
+}
+
+// ---------- Equipment panel ----------
+const SLOT_LABELS = { weapon: 'Weapon', armor: 'Armor', trinket: 'Trinket' };
+
+function itemStatsText(item) {
+  return item.statText || Object.entries(item.stats || {}).map(([k, v]) => `+${v} ${k.toUpperCase()}`).join(', ');
+}
+
+function renderEquipment(run) {
+  const equipment = run.equipment || {};
+  const inventory = run.inventory || [];
+  const total = inventory.length + Object.values(equipment).filter(Boolean).length;
+  const btn = $('bag-btn');
+  btn.textContent = total ? `🎒 Bag · ${total}` : '🎒 Bag';
+  btn.setAttribute('aria-expanded', String(bagOpen));
+  btn.classList.toggle('is-active', bagOpen);
+  show('equip-card', bagOpen);
+  if (!bagOpen) return;
+
+  const locked = busy || !!run.pending || run.phase === 'over';
+
+  const slots = $('equip-slots');
+  slots.textContent = '';
+  Object.entries(SLOT_LABELS).forEach(([slot, label]) => {
+    const item = equipment[slot];
+    const card = el(item ? 'button' : 'div', 'equip-slot' + (item ? ` rarity-${item.rarity}` : ' is-empty'));
+    if (item) {
+      card.type = 'button';
+      card.title = `Unequip ${item.name}`;
+      card.disabled = locked;
+      card.append(
+        el('span', 'slot-tag', label),
+        el('span', 'item-line', `${item.icon} ${item.name}`),
+        el('span', 'item-stats', itemStatsText(item)),
+        el('span', 'rarity-tag', item.rarityLabel)
+      );
+      card.addEventListener('click', () => changeEquipment('unequip', { slot }));
+    } else {
+      card.append(el('span', 'slot-tag', label), el('span', 'slot-empty', 'Empty'));
+    }
+    slots.appendChild(card);
+  });
+
+  const bag = $('bag-list');
+  bag.textContent = '';
+  if (!inventory.length) {
+    bag.appendChild(el('li', 'empty', 'Your bag is empty. Defeat enemies to find loot.'));
+    return;
+  }
+  inventory.forEach(item => {
+    const li = el('li', 'bag-item rarity-' + item.rarity);
+    const main = el('div', 'bag-main');
+    main.append(
+      el('span', 'item-line', `${item.icon} ${item.name}`),
+      el('span', 'item-stats', itemStatsText(item))
+    );
+    const action = el('button', 'small equip-btn', `Equip · ${SLOT_LABELS[item.slot]}`);
+    action.type = 'button';
+    action.disabled = locked;
+    action.addEventListener('click', () => changeEquipment('equip', { itemId: item.id }));
+    li.append(el('span', 'rarity-tag', item.rarityLabel), main, action);
+    bag.appendChild(li);
+  });
+}
+
+function changeEquipment(kind, payload) {
+  guarded(async () => {
+    setMessage('');
+    run = (await api('/api/run/' + kind, 'POST', payload)).run;
+  });
 }
 
 // ---------- Puzzle panel ----------
@@ -582,6 +660,7 @@ $('continue-run-btn').addEventListener('click', () => { showView('battle'); rend
 $('again-btn').addEventListener('click', startRun);
 $('battle-home-btn').addEventListener('click', goHome);
 $('over-home-btn').addEventListener('click', goHome);
+$('bag-btn').addEventListener('click', () => { bagOpen = !bagOpen; render(); });
 $('submit-btn').addEventListener('click', submitAnswers);
 
 document.querySelectorAll('#actions button').forEach(b => b.addEventListener('click', () => {
@@ -610,6 +689,7 @@ document.addEventListener('keydown', e => {
   }
   if (run.phase === 'map' && /^[1-2]$/.test(e.key)) return chooseDoor(Number(e.key) - 1);     // 1/2 = doors
   if ((run.phase === 'event' || run.phase === 'shop') && e.key === 'Enter') return leaveRoom();
+  if (e.key.toLowerCase() === 'b') { bagOpen = !bagOpen; render(); return; }                 // B = bag
   const map = { a: 'attack', s: 'skill', h: 'heal', d: 'defend', p: 'potion' };
   const btn = map[e.key.toLowerCase()] && document.querySelector(`#actions button[data-action="${map[e.key.toLowerCase()]}"]`);
   if (btn && !btn.disabled && !$('actions').hidden) btn.click();

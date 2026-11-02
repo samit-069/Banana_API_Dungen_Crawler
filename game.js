@@ -24,18 +24,55 @@ const TIERS = {
   boss:    { label: 'Boss',     puzzles: 3, secondsPerPuzzle: 12 }
 };
 
+// ---------- Equipment (pure data: add gear here without touching the rules) ----------
+const EQUIP_SLOTS = ['weapon', 'armor', 'trinket'];
+const RARITIES = {
+  common:   { label: 'Common',   mult: 1.00, order: 0 },
+  uncommon: { label: 'Uncommon', mult: 1.35, order: 1 },
+  rare:     { label: 'Rare',     mult: 1.75, order: 2 },
+  epic:     { label: 'Epic',     mult: 2.40, order: 3 }
+};
+const ITEMS = {
+  rusty_dagger:    { name: 'Rusty Dagger',    icon: '🗡️', slot: 'weapon',  stats: { atk: 2 },                     value: 12 },
+  short_sword:     { name: 'Short Sword',     icon: '⚔️', slot: 'weapon',  stats: { atk: 4 },                     value: 25 },
+  iron_axe:        { name: 'Iron Axe',        icon: '🪓', slot: 'weapon',  stats: { atk: 7 },                     value: 45 },
+  dragon_fang:     { name: 'Dragon Fang',     icon: '🐲', slot: 'weapon',  stats: { atk: 11 },                    value: 90 },
+  cloth_vest:      { name: 'Cloth Vest',      icon: '🧥', slot: 'armor',   stats: { def: 1, maxHp: 5 },           value: 14 },
+  leather_armor:   { name: 'Leather Armor',   icon: '🥋', slot: 'armor',   stats: { def: 2, maxHp: 10 },          value: 30 },
+  chainmail:       { name: 'Chainmail',       icon: '🛡️', slot: 'armor',   stats: { def: 4, maxHp: 18 },          value: 55 },
+  dragonscale:     { name: 'Dragonscale',     icon: '🐉', slot: 'armor',   stats: { def: 6, maxHp: 30 },          value: 100 },
+  lucky_charm:     { name: 'Lucky Charm',     icon: '🍀', slot: 'trinket', stats: { maxMp: 5 },                   value: 18 },
+  ember_ring:      { name: 'Ember Ring',      icon: '💍', slot: 'trinket', stats: { atk: 2, maxMp: 5 },           value: 40 },
+  vitality_amulet: { name: 'Vitality Amulet', icon: '📿', slot: 'trinket', stats: { maxHp: 15 },                  value: 40 },
+  banana_idol:     { name: 'Banana Idol',     icon: '🍌', slot: 'trinket', stats: { atk: 3, def: 1, maxHp: 10 }, value: 80 }
+};
+// Fallback tables; each enemy normally points at its own loot in BESTIARY.
+const LOOT_BY_TIER = {
+  mob:     ['rusty_dagger', 'cloth_vest', 'lucky_charm'],
+  midboss: ['short_sword', 'leather_armor', 'ember_ring', 'vitality_amulet'],
+  boss:    ['iron_axe', 'chainmail', 'dragon_fang', 'dragonscale', 'banana_idol']
+};
+const DROP_CHANCE = { mob: 0.35, midboss: 0.75, boss: 1.0 };
+const RARITY_ODDS = {
+  mob:     [['common', 0.70], ['uncommon', 0.25], ['rare', 0.05]],
+  midboss: [['common', 0.30], ['uncommon', 0.45], ['rare', 0.22], ['epic', 0.03]],
+  boss:    [['uncommon', 0.25], ['rare', 0.55], ['epic', 0.20]]
+};
+const STAT_LABELS = { atk: 'ATK', def: 'DEF', maxHp: 'HP', maxMp: 'MP' };
+const statText = stats => Object.entries(stats).map(([k, v]) => `+${v} ${STAT_LABELS[k] || k}`).join(', ');
+
 // ---------- Content (pure data: add monsters / floors here without touching the rules) ----------
 const BESTIARY = {
-  Slime:             { emoji: '🟢', tier: 'mob',     hp: 30,  atk: 6,  def: 0, xp: 14,  gold: 10 },
-  Rat:               { emoji: '🐀', tier: 'mob',     hp: 26,  atk: 7,  def: 0, xp: 12,  gold: 8 },
-  Goblin:            { emoji: '👺', tier: 'mob',     hp: 40,  atk: 8,  def: 1, xp: 18,  gold: 12 },
-  Skeleton:          { emoji: '🦴', tier: 'mob',     hp: 50,  atk: 10, def: 2, xp: 24,  gold: 15 },
-  Orc:               { emoji: '👹', tier: 'mob',     hp: 55,  atk: 11, def: 2, xp: 28,  gold: 18 },
-  Wraith:            { emoji: '👻', tier: 'mob',     hp: 60,  atk: 12, def: 3, xp: 34,  gold: 24 },
-  Gargoyle:          { emoji: '🗿', tier: 'mob',     hp: 70,  atk: 13, def: 4, xp: 40,  gold: 28 },
-  'Skeleton Knight': { emoji: '💀', tier: 'midboss', hp: 75,  atk: 12, def: 3, xp: 55,  gold: 40 },
-  'Orc Warlord':     { emoji: '🪓', tier: 'midboss', hp: 95,  atk: 15, def: 4, xp: 80,  gold: 60 },
-  'Ancient Dragon':  { emoji: '🐉', tier: 'boss',    hp: 130, atk: 17, def: 4, xp: 150, gold: 100 }
+  Slime:             { emoji: '🟢', tier: 'mob',     hp: 30,  atk: 6,  def: 0, xp: 14,  gold: 10,  loot: ['cloth_vest', 'lucky_charm'] },
+  Rat:               { emoji: '🐀', tier: 'mob',     hp: 26,  atk: 7,  def: 0, xp: 12,  gold: 8,   loot: ['rusty_dagger', 'lucky_charm'] },
+  Goblin:            { emoji: '👺', tier: 'mob',     hp: 40,  atk: 8,  def: 1, xp: 18,  gold: 12,  loot: ['rusty_dagger', 'cloth_vest'] },
+  Skeleton:          { emoji: '🦴', tier: 'mob',     hp: 50,  atk: 10, def: 2, xp: 24,  gold: 15,  loot: ['short_sword', 'cloth_vest'] },
+  Orc:               { emoji: '👹', tier: 'mob',     hp: 55,  atk: 11, def: 2, xp: 28,  gold: 18,  loot: ['short_sword', 'leather_armor'] },
+  Wraith:            { emoji: '👻', tier: 'mob',     hp: 60,  atk: 12, def: 3, xp: 34,  gold: 24,  loot: ['ember_ring', 'lucky_charm'] },
+  Gargoyle:          { emoji: '🗿', tier: 'mob',     hp: 70,  atk: 13, def: 4, xp: 40,  gold: 28,  loot: ['chainmail', 'vitality_amulet'] },
+  'Skeleton Knight': { emoji: '💀', tier: 'midboss', hp: 75,  atk: 12, def: 3, xp: 55,  gold: 40,  loot: ['short_sword', 'leather_armor', 'ember_ring'] },
+  'Orc Warlord':     { emoji: '🪓', tier: 'midboss', hp: 95,  atk: 15, def: 4, xp: 80,  gold: 60,  loot: ['iron_axe', 'chainmail', 'vitality_amulet'] },
+  'Ancient Dragon':  { emoji: '🐉', tier: 'boss',    hp: 130, atk: 17, def: 4, xp: 150, gold: 100, loot: ['dragon_fang', 'dragonscale', 'banana_idol'] }
 };
 
 const DUNGEON = {
@@ -75,6 +112,96 @@ function gameError(message, status = 400) {
 const xpToNext = level => 25 * level;
 const pick = (run, arr) => arr[Math.min(arr.length - 1, Math.floor(run.rng() * arr.length))];
 
+// ---------- Equipment rules ----------
+// Sum of every equipped item's stats. Gear stats are final (rarity already applied at drop time).
+function equipmentBonus(hero) {
+  const bonus = { atk: 0, def: 0, maxHp: 0, maxMp: 0 };
+  for (const slot of EQUIP_SLOTS) {
+    const item = hero.equipment[slot];
+    if (!item) continue;
+    for (const [stat, amount] of Object.entries(item.stats)) bonus[stat] = (bonus[stat] || 0) + amount;
+  }
+  return bonus;
+}
+
+// Derived stats always come from base + equipped gear, so swapping can never double-count.
+// A higher max stat grants the extra points immediately; a lower one clamps current values.
+function recalcHero(hero) {
+  const bonus = equipmentBonus(hero);
+  const nextMaxHp = hero.base.maxHp + bonus.maxHp;
+  const nextMaxMp = hero.base.maxMp + bonus.maxMp;
+  const hpGain = Math.max(0, nextMaxHp - hero.maxHp);
+  const mpGain = Math.max(0, nextMaxMp - hero.maxMp);
+  hero.maxHp = nextMaxHp;
+  hero.maxMp = nextMaxMp;
+  hero.atk = hero.base.atk + bonus.atk;
+  hero.def = hero.base.def + bonus.def;
+  hero.hp = Math.max(0, Math.min(hero.maxHp, hero.hp + hpGain));
+  hero.mp = Math.max(0, Math.min(hero.maxMp, hero.mp + mpGain));
+  return bonus;
+}
+
+function rollRarity(run, tier) {
+  let r = run.rng();
+  for (const [rarity, chance] of RARITY_ODDS[tier]) { if (r < chance) return rarity; r -= chance; }
+  return RARITY_ODDS[tier][RARITY_ODDS[tier].length - 1][0];
+}
+
+function makeItem(run, baseId, rarity) {
+  const base = ITEMS[baseId], meta = RARITIES[rarity];
+  const stats = {};
+  for (const [stat, amount] of Object.entries(base.stats)) stats[stat] = Math.max(1, Math.round(amount * meta.mult));
+  return {
+    id: run.hero.nextItemId++, key: baseId, name: base.name, icon: base.icon, slot: base.slot,
+    rarity, rarityLabel: meta.label, stats, value: Math.round(base.value * meta.mult)
+  };
+}
+
+// Called when an enemy dies: roll the tier's drop chance, then that enemy's own loot table.
+function rollLoot(run) {
+  const e = run.enemy;
+  if (!e || run.rng() >= (DROP_CHANCE[e.tier] ?? 0)) return null;
+  const table = e.loot && e.loot.length ? e.loot : (LOOT_BY_TIER[e.tier] || []);
+  if (!table.length) return null;
+  const item = makeItem(run, pick(run, table), rollRarity(run, e.tier));
+  run.hero.inventory.push(item);
+  return item;
+}
+
+function canChangeEquipment(run) {
+  if (run.phase === 'over') throw gameError('The run is over.');
+  if (run.pending || run.busy) throw gameError('Finish the current puzzle first.');
+}
+
+// Move an item from the bag into its slot; anything already there goes back to the bag.
+function equipItem(run, itemId) {
+  canChangeEquipment(run);
+  const h = run.hero;
+  const idx = h.inventory.findIndex(item => item.id === Number(itemId));
+  if (idx === -1) throw gameError('That item is not in your inventory.');
+  const item = h.inventory[idx];
+  const replaced = h.equipment[item.slot];
+  h.inventory.splice(idx, 1);
+  h.equipment[item.slot] = item;
+  if (replaced) h.inventory.push(replaced);
+  const bonus = recalcHero(h);
+  run.events.emit('equipped', { item, replaced, bonus });
+  return item;
+}
+
+function unequipItem(run, slot) {
+  canChangeEquipment(run);
+  if (!EQUIP_SLOTS.includes(slot)) throw gameError('Unknown equipment slot.');
+  const h = run.hero;
+  const item = h.equipment[slot];
+  if (!item) throw gameError('Nothing is equipped in that slot.');
+  h.equipment[slot] = null;
+  h.inventory.push(item);
+  const bonus = recalcHero(h);
+  run.events.emit('unequipped', { item, slot, bonus });
+  return item;
+}
+
 function puzzleCount(action, tier) {
   const base = TIERS[tier].puzzles;
   if (action === 'attack') return base;
@@ -90,7 +217,14 @@ function createRun(username, rng = Math.random) {
     log: [], phase: 'map', won: false, startedAt: Date.now(),
     floorIdx: 0, step: 0, map: [], room: null,
     cleared: 0, goldEarned: 0, combo: 0, busy: false, pending: null, recorded: false,
-    hero: { level: 1, xp: 0, maxHp: 60, hp: 60, maxMp: 20, mp: 20, atk: 12, def: 2, gold: 0, potions: 1, defending: false },
+    hero: {
+      level: 1, xp: 0,
+      base: { maxHp: 60, maxMp: 20, atk: 12, def: 2 },
+      maxHp: 60, hp: 60, maxMp: 20, mp: 20, atk: 12, def: 2,
+      gold: 0, potions: 1, defending: false,
+      equipment: { weapon: null, armor: null, trinket: null },
+      inventory: [], nextItemId: 1
+    },
     enemy: null
   };
   wireLog(run);
@@ -117,6 +251,9 @@ function wireLog(run) {
   on('enemyHit', r => say(`${r.name} ${r.heavy ? 'unleashes a HEAVY attack' : 'attacks'} for ${r.damage} damage` +
     (r.blocked ? ' (blocked half)' : '') + '.'));
   on('enemyDefeated', r => say(`${r.name} is defeated! +${r.xp} XP, +${r.gold} gold.`));
+  on('loot', r => say(`Loot! ${r.item.icon} ${r.item.rarityLabel} ${r.item.name} (${statText(r.item.stats)}) goes into your bag.`));
+  on('equipped', r => say(`Equipped ${r.item.icon} ${r.item.name}` + (r.replaced ? `, stowing ${r.replaced.name}.` : '.')));
+  on('unequipped', r => say(`Unequipped ${r.item.icon} ${r.item.name}.`));
   on('levelUp', r => say(`LEVEL UP! You are now level ${r.level}.`));
   on('heroDefeated', () => say('You have fallen...'));
   on('victory', () => say('The dungeon is conquered. You win!'));
@@ -308,10 +445,13 @@ function onEnemyDefeated(run) {
   while (h.xp >= xpToNext(h.level)) {
     h.xp -= xpToNext(h.level);
     h.level++;
-    h.maxHp += 12; h.maxMp += 4; h.atk += 3; h.def += 1;
+    h.base.maxHp += 12; h.base.maxMp += 4; h.base.atk += 3; h.base.def += 1;
+    recalcHero(h);
     h.hp = h.maxHp; h.mp = h.maxMp;                              // full restore on level up
     run.events.emit('levelUp', { level: h.level });
   }
+  const loot = rollLoot(run);
+  if (loot) run.events.emit('loot', { item: loot });
   const lastFloor = run.floorIdx === DUNGEON.floors.length - 1;
   if (run.room.type === 'boss' && lastFloor) {
     run.won = true;
@@ -351,6 +491,13 @@ function view(run, now = Date.now()) {
     actions[key] = { label: def.label, mp: def.mp, puzzles: puzzleCount(key, e ? e.tier : 'mob') };
   }
   const floor = DUNGEON.floors[run.floorIdx];
+  const itemView = item => item && ({
+    id: item.id, key: item.key, name: item.name, icon: item.icon, slot: item.slot,
+    rarity: item.rarity, rarityLabel: item.rarityLabel, stats: item.stats,
+    statText: statText(item.stats), value: item.value
+  });
+  const equipment = {};
+  for (const slot of EQUIP_SLOTS) equipment[slot] = itemView(run.hero.equipment[slot]);
   const doorView = d => ({
     type: d.type, icon: ROOM_INFO[d.type].icon, label: ROOM_INFO[d.type].label,
     enemy: d.enemy ? { name: d.enemy, emoji: BESTIARY[d.enemy].emoji, tierLabel: TIERS[BESTIARY[d.enemy].tier].label } : null
@@ -365,7 +512,10 @@ function view(run, now = Date.now()) {
     room: run.room ? { type: run.room.type, icon: ROOM_INFO[run.room.type].icon, label: ROOM_INFO[run.room.type].label } : null,
     score: scoreOf(run), combo: run.combo, potionPrice: POTION_PRICE, actions,
     hero: { level: h.level, xp: h.xp, xpToNext: xpToNext(h.level), hp: h.hp, maxHp: h.maxHp, mp: h.mp, maxMp: h.maxMp,
-            atk: h.atk, def: h.def, gold: h.gold, potions: h.potions, defending: h.defending },
+            atk: h.atk, def: h.def, gold: h.gold, potions: h.potions, defending: h.defending,
+            base: { ...h.base }, bonus: equipmentBonus(h) },
+    equipment,
+    inventory: h.inventory.map(itemView),
     enemy: e ? { name: e.name, emoji: e.emoji, tier: e.tier, tierLabel: TIERS[e.tier].label,
                  hp: e.hp, maxHp: e.maxHp, nextMove: e.nextMove } : null,
     pending: run.pending ? { n: run.pending.n, msLeft: Math.max(0, run.pending.deadline - now) } : null,
@@ -373,5 +523,6 @@ function view(run, now = Date.now()) {
   };
 }
 
-module.exports = { createRun, startAction, answer, enterRoom, leaveRoom, buyPotion, view, scoreOf,
-                   BESTIARY, DUNGEON, TIERS, ACTIONS, POTION_PRICE, GRACE_MS };
+module.exports = { createRun, startAction, answer, enterRoom, leaveRoom, buyPotion, equipItem, unequipItem, view, scoreOf,
+                   BESTIARY, DUNGEON, TIERS, ACTIONS, ITEMS, RARITIES, EQUIP_SLOTS, LOOT_BY_TIER,
+                   POTION_PRICE, GRACE_MS };

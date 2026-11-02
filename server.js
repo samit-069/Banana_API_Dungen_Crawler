@@ -211,6 +211,19 @@ const routes = {
     send(res, 200, { run: game.view(run) });
   } },
 
+  // Equipment: move an item between the bag and its slot. Free action, blocked mid-puzzle.
+  'POST /api/run/equip': { auth: true, handler: async (ctx, res) => {
+    const run = requireRun(ctx);
+    game.equipItem(run, ctx.body.itemId);
+    send(res, 200, { run: game.view(run) });
+  } },
+
+  'POST /api/run/unequip': { auth: true, handler: async (ctx, res) => {
+    const run = requireRun(ctx);
+    game.unequipItem(run, String(ctx.body.slot));
+    send(res, 200, { run: game.view(run) });
+  } },
+
   // Dungeon navigation: pick one of the doors offered on the map, and leave a room when done.
   'POST /api/run/door': { auth: true, handler: async (ctx, res) => {
     const run = requireRun(ctx);

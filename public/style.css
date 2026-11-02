@@ -335,6 +335,45 @@ button.door span { font-weight: 400; color: var(--muted); font-size: .84rem; }
 #log li { padding: 5px 0; border-bottom: 1px solid #ffffff0d; }
 #log li:last-child { border-bottom: 0; }
 
+/* ---------- Equipment ---------- */
+#bag-btn.is-active { border-color: var(--accent); color: var(--accent); background: #f5b70014; }
+.equip-slots { display: grid; grid-template-columns: repeat(3, 1fr); gap: 8px; margin-bottom: 6px; }
+.equip-slot {
+  display: flex; flex-direction: column; gap: 3px; text-align: left;
+  padding: 11px; border: 1px solid var(--line); border-radius: 12px;
+  background: #00000025; color: var(--fg); font-weight: 600;
+}
+.equip-slot:disabled { opacity: .62; cursor: not-allowed; }
+.equip-slot:not(.is-empty):not(:disabled):hover { border-color: var(--accent); background: #f5b7000e; }
+.equip-slot.is-empty { border-style: dashed; color: var(--muted); justify-content: center; min-height: 82px; }
+.slot-tag { font-size: .64rem; text-transform: uppercase; letter-spacing: .12em; color: var(--muted); font-weight: 800; }
+.slot-empty { font-size: .84rem; }
+.item-line { font-size: .88rem; font-weight: 700; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.item-stats { font-size: .76rem; color: var(--muted); }
+.rarity-tag {
+  align-self: flex-start; margin-top: 2px; font-size: .62rem; font-weight: 800;
+  text-transform: uppercase; letter-spacing: .08em; padding: 2px 7px; border-radius: 999px;
+  border: 1px solid var(--line); color: var(--muted); background: #00000030;
+}
+.rarity-common .rarity-tag { color: #cfc8e0; }
+.rarity-uncommon .rarity-tag { color: #7bea9b; border-color: #5fd97f66; background: #5fd97f12; }
+.rarity-rare .rarity-tag { color: #7fb4ff; border-color: #4d8dff66; background: #4d8dff14; }
+.rarity-epic .rarity-tag { color: #e3a6ff; border-color: #b45cff77; background: #b45cff16; }
+.equip-slot.rarity-uncommon { border-color: #5fd97f55; }
+.equip-slot.rarity-rare { border-color: #4d8dff66; box-shadow: inset 0 0 22px #4d8dff12; }
+.equip-slot.rarity-epic { border-color: #b45cff77; box-shadow: inset 0 0 22px #b45cff18; }
+.bag-label { margin: 14px 0 8px; }
+.bag-list { list-style: none; margin: 0; padding: 0; display: grid; gap: 7px; }
+.bag-item {
+  display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: 10px; align-items: center;
+  padding: 9px 10px; border: 1px solid #ffffff0d; border-radius: 11px; background: #00000020;
+}
+.bag-main { display: flex; flex-direction: column; gap: 2px; min-width: 0; }
+.equip-btn { white-space: nowrap; }
+.bag-item.rarity-uncommon { border-color: #5fd97f40; }
+.bag-item.rarity-rare { border-color: #4d8dff50; }
+.bag-item.rarity-epic { border-color: #b45cff60; }
+
 /* ---------- Toast ---------- */
 #message {
   position: fixed; left: 50%; bottom: 22px; z-index: 40; transform: translateX(-50%);
@@ -375,6 +414,9 @@ button.door span { font-weight: 400; color: var(--muted); font-size: .84rem; }
   .history-row { grid-template-columns: minmax(0, 1.4fr) 80px 80px; }
   .history-row > *:nth-child(4), .history-row > *:nth-child(5) { display: none; }
   .digits { grid-template-columns: repeat(5, 1fr); }
+  .equip-slots { grid-template-columns: 1fr; }
+  .bag-item { grid-template-columns: minmax(0, 1fr) auto; }
+  .bag-item .rarity-tag { display: none; }
   .page-head { align-items: flex-start; }
   .head-actions { width: 100%; }
   .head-actions button { flex: 1; }
