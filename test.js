@@ -464,7 +464,100 @@ test('enchanting needs enough gold and no pending puzzle', () => {
   game.enchantItem(run, 501, 'sharp');
   assert.strictEqual(h.gold, 80);
 });
+// ---------- Equipment & loot ----------
+test('bosses always drop from their own loot table; rarity scales the stats', async () => {
+  const run = inFight('Ancient Dragon');
+  run.enemy.hp = 1;
+  await game.startAction(run, 'attack', SOURCE);
+  game.answer(run, [7, 7, 7]);
+  assert.strictEqual(run.hero.inventory.length, 1);                 // boss drop chance is 100%
+  const item = run.hero.inventory[0];
+  assert.strictEqual(item.key, 'dragonscale');                      // rng 0.5 picks the middle entry
+  assert.strictEqual(item.rarity, 'rare');
+  assert.deepStrictEqual(item.stats, { def: 11, maxHp: 53 });       // base 6/30 * rare 1.75
+  const v = game.view(run);
+  assert.strictEqual(v.inventory.length, 1);
+  assert.strictEqual(v.inventory[0].rarityLabel, 'Rare');
+  assert.strictEqual(v.inventory[0].statText, '+11 DEF, +53 HP');
+  assert.strictEqual(v.equipment.weapon, null);
+  assert.ok(v.log.some(l => /Loot! .*Dragonscale/.test(l)));
+});
 
+test('mob drops are chance-based and come from that enemy, not the tier fallback', async () => {
+  const lucky = () => 0;                                            // every roll succeeds, common rarity
+  const run = game.createRun('u', lucky);
+  const i = run.map[0].findIndex(d => d.type === 'combat');
+  run.map[0][i] = { type: 'combat', enemy: 'Slime' };
+  game.enterRoom(run, i);
+  run.enemy.hp = 1;
+  await game.startAction(run, 'attack', SOURCE);
+  game.answer(run, [7]);
+  assert.strictEqual(run.hero.inventory.length, 1);
+  assert.strictEqual(run.hero.inventory[0].key, 'cloth_vest');      // Slime's own table
+  assert.strictEqual(run.hero.inventory[0].rarity, 'common');
+
+  const unlucky = inFight('Slime');                                 // rng 0.5 > 35% drop chance
+  unlucky.enemy.hp = 1;
+  await game.startAction(unlucky, 'attack', SOURCE);
+  game.answer(unlucky, [7]);
+  assert.strictEqual(unlucky.hero.inventory.length, 0);
+});
+
+test('equipping gear adds stats, swapping stows the old item, unequipping removes the bonus', () => {
+  const run = inFight('Slime');
+  const h = run.hero;
+  h.inventory.push(
+    { id: 101, key: 'short_sword', name: 'Short Sword', icon: '⚔️', slot: 'weapon', rarity: 'common', rarityLabel: 'Common', stats: { atk: 4 }, value: 25 },
+    { id: 102, key: 'iron_axe', name: 'Iron Axe', icon: '🪓', slot: 'weapon', rarity: 'rare', rarityLabel: 'Rare', stats: { atk: 12 }, value: 79 },
+    { id: 103, key: 'leather_armor', name: 'Leather Armor', icon: '🥋', slot: 'armor', rarity: 'common', rarityLabel: 'Common', stats: { def: 2, maxHp: 10 }, value: 30 }
+  );
+  const atk = h.atk, def = h.def, maxHp = h.maxHp, hp = h.hp;
+
+  game.equipItem(run, 101);
+  assert.strictEqual(h.equipment.weapon.name, 'Short Sword');
+  assert.strictEqual(h.atk, atk + 4);
+  assert.strictEqual(h.inventory.length, 2);
+
+  game.equipItem(run, 102);                                         // swap the slot
+  assert.strictEqual(h.equipment.weapon.name, 'Iron Axe');
+  assert.strictEqual(h.atk, atk + 12);                              // not atk + 4 + 12
+  assert.ok(h.inventory.some(i => i.name === 'Short Sword'));
+
+  game.equipItem(run, 103);                                         // armor also raises the cap and current HP
+  assert.strictEqual(h.maxHp, maxHp + 10);
+  assert.strictEqual(h.hp, hp + 10);
+  assert.strictEqual(h.def, def + 2);
+
+  game.unequipItem(run, 'weapon');
+  assert.strictEqual(h.equipment.weapon, null);
+  assert.strictEqual(h.atk, atk);
+  game.unequipItem(run, 'armor');
+  assert.strictEqual(h.maxHp, maxHp);
+  assert.strictEqual(h.hp, hp);                                     // clamped back down
+  assert.strictEqual(h.def, def);
+  assert.strictEqual(h.inventory.length, 3);
+
+  const v = game.view(run);
+  assert.deepStrictEqual(v.hero.bonus, { atk: 0, def: 0, maxHp: 0, maxMp: 0 });
+  assert.strictEqual(v.inventory.length, 3);
+});
+
+test('equipment changes are rejected for bad ids/slots and while a puzzle is pending', async () => {
+  const run = inFight('Slime');
+  assert.throws(() => game.equipItem(run, 999), /not in your inventory/);
+  assert.throws(() => game.unequipItem(run, 'hat'), /Unknown equipment slot/);
+  assert.throws(() => game.unequipItem(run, 'weapon'), /Nothing is equipped/);
+
+  run.hero.inventory.push({ id: 7, name: 'Rusty Dagger', icon: '🗡️', slot: 'weapon', rarity: 'common', rarityLabel: 'Common', stats: { atk: 2 }, value: 12 });
+  await game.startAction(run, 'attack', SOURCE);
+  assert.throws(() => game.equipItem(run, 7), /Finish the current puzzle/);
+  game.answer(run, [7]);
+  game.equipItem(run, 7);
+  assert.strictEqual(run.hero.equipment.weapon.name, 'Rusty Dagger');
+
+  run.phase = 'over';
+  assert.throws(() => game.unequipItem(run, 'weapon'), /run is over/);
+});
 // ---------- HTTP integration tests ----------
 let base, server, cookie = '';
 
