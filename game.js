@@ -61,6 +61,22 @@ const RARITY_ODDS = {
 const STAT_LABELS = { atk: 'ATK', def: 'DEF', maxHp: 'HP', maxMp: 'MP' };
 const statText = stats => Object.entries(stats).map(([k, v]) => `+${v} ${STAT_LABELS[k] || k}`).join(', ');
 
+// ---------- Enchantments (one per item; tier depends on puzzle performance) ----------
+// `solved` counts correct answers given before the turn's deadline during this run, so
+// accurate, timely puzzle play directly unlocks stronger magic.
+const ENCHANTS = {
+  sharp:  { name: 'Sharpened', icon: '🔪', stat: 'atk',   base: 2 },
+  warded: { name: 'Warded',    icon: '🛡️', stat: 'def',   base: 2 },
+  vital:  { name: 'Vital',     icon: '❤️', stat: 'maxHp', base: 8 },
+  arcane: { name: 'Arcane',    icon: '🔷', stat: 'maxMp', base: 4 }
+};
+const ENCHANT_TIERS = [
+  { tier: 1, name: 'Lesser',   solved: 3,  gold: 20,  mult: 1 },
+  { tier: 2, name: 'Greater',  solved: 8,  gold: 45,  mult: 2 },
+  { tier: 3, name: 'Superior', solved: 15, gold: 80,  mult: 3 },
+  { tier: 4, name: 'Mythic',   solved: 25, gold: 140, mult: 4 }
+];
+
 // ---------- Content (pure data: add monsters / floors here without touching the rules) ----------
 const BESTIARY = {
   Slime:             { emoji: '🟢', tier: 'mob',     hp: 30,  atk: 6,  def: 0, xp: 14,  gold: 10,  loot: ['cloth_vest', 'lucky_charm'] },
@@ -85,14 +101,15 @@ const DUNGEON = {
 };
 
 // Chance table for the optional second door (the first door is always a fight).
-const OTHER_DOOR_ODDS = [['combat', 0.40], ['treasure', 0.20], ['rest', 0.25], ['shop', 0.15]];
+const OTHER_DOOR_ODDS = [['combat', 0.35], ['treasure', 0.18], ['rest', 0.22], ['shop', 0.10], ['enchant', 0.15]];
 
 const ROOM_INFO = {
   combat:   { icon: '⚔️', label: 'Monster' },
   boss:     { icon: '☠️', label: 'Floor boss' },
   treasure: { icon: '💰', label: 'Treasure' },
   rest:     { icon: '🔥', label: 'Campfire' },
-  shop:     { icon: '🛒', label: 'Merchant' }
+  shop:     { icon: '🛒', label: 'Merchant' },
+  enchant:  { icon: '🔮', label: 'Enchanter' }
 };
 
 const ACTIONS = {
@@ -119,7 +136,10 @@ function equipmentBonus(hero) {
   for (const slot of EQUIP_SLOTS) {
     const item = hero.equipment[slot];
     if (!item) continue;
-    for (const [stat, amount] of Object.entries(item.stats)) bonus[stat] = (bonus[stat] || 0) + amount;
+    for (const stats of [item.stats, item.enchant && item.enchant.stats]) {
+      if (!stats) continue;
+      for (const [stat, amount] of Object.entries(stats)) bonus[stat] = (bonus[stat] || 0) + amount;
+    }
   }
   return bonus;
 }
@@ -202,6 +222,40 @@ function unequipItem(run, slot) {
   return item;
 }
 
+// ---------- Enchanting ----------
+// Highest tier the player has earned this run, or null before the first threshold.
+function availableEnchantTier(run) {
+  let unlocked = null;
+  for (const tier of ENCHANT_TIERS) if (run.puzzleStats.solved >= tier.solved) unlocked = tier;
+  return unlocked;
+}
+
+// Apply (or replace) the enchantment on an equipped or bagged item. Only in an enchanter room.
+function enchantItem(run, itemId, enchantKey) {
+  if (run.phase !== 'enchant') throw gameError('You need to find an enchanter to enchant gear.');
+  if (run.pending || run.busy) throw gameError('Finish the current puzzle first.');
+  const tier = availableEnchantTier(run);
+  if (!tier) throw gameError(`Solve ${ENCHANT_TIERS[0].solved} puzzles in time to unlock enchanting.`);
+  const def = ENCHANTS[enchantKey];
+  if (!def) throw gameError('Unknown enchantment.');
+  const h = run.hero;
+  const item = [...EQUIP_SLOTS.map(slot => h.equipment[slot]), ...h.inventory]
+    .find(candidate => candidate && candidate.id === Number(itemId));
+  if (!item) throw gameError('That item is not in your equipment or bag.');
+  if (h.gold < tier.gold) throw gameError('Not enough gold.');
+
+  h.gold -= tier.gold;
+  item.enchant = {
+    key: enchantKey, name: def.name, icon: def.icon,
+    tier: tier.tier, tierName: tier.name,
+    stats: { [def.stat]: def.base * tier.mult },
+    text: `+${def.base * tier.mult} ${STAT_LABELS[def.stat]}`
+  };
+  recalcHero(h);
+  run.events.emit('enchanted', { item, enchant: item.enchant, cost: tier.gold });
+  return item;
+}
+
 function puzzleCount(action, tier) {
   const base = TIERS[tier].puzzles;
   if (action === 'attack') return base;
@@ -217,6 +271,7 @@ function createRun(username, rng = Math.random) {
     log: [], phase: 'map', won: false, startedAt: Date.now(),
     floorIdx: 0, step: 0, map: [], room: null,
     cleared: 0, goldEarned: 0, combo: 0, busy: false, pending: null, recorded: false,
+    puzzleStats: { solved: 0, attempted: 0, perfectTurns: 0 },
     hero: {
       level: 1, xp: 0,
       base: { maxHp: 60, maxMp: 20, atk: 12, def: 2 },
@@ -238,7 +293,7 @@ function wireLog(run) {
   const on = (name, fn) => run.events.on(name, fn);
   const say = msg => run.log.push(msg);
   on('floorEntered', r => say(`Floor ${r.number}: ${r.name}.` + (r.healed ? ` You rest on the stairs (+${r.healed} HP).` : '')));
-  on('roomEntered', r => say(r.type === 'combat' || r.type === 'boss' ? `${r.enemy} blocks your way!` : `You enter a ${ROOM_INFO[r.type].label.toLowerCase()} room.`));
+  on('roomEntered', r => say(r.type === 'combat' || r.type === 'boss' ? `${r.enemy} blocks your way!` : `You enter the ${ROOM_INFO[r.type].label.toLowerCase()} room.`));
   on('treasure', r => say(`You find ${r.gold} gold` + (r.potion ? ' and a potion!' : '.')));
   on('rest', r => say(`You rest at the campfire: +${r.hp} HP, +${r.mp} MP.`));
   on('puzzleResult', r => say(r.timedOut ? 'Time ran out!' : `Puzzles solved: ${r.correct}/${r.total}`));
@@ -254,6 +309,7 @@ function wireLog(run) {
   on('loot', r => say(`Loot! ${r.item.icon} ${r.item.rarityLabel} ${r.item.name} (${statText(r.item.stats)}) goes into your bag.`));
   on('equipped', r => say(`Equipped ${r.item.icon} ${r.item.name}` + (r.replaced ? `, stowing ${r.replaced.name}.` : '.')));
   on('unequipped', r => say(`Unequipped ${r.item.icon} ${r.item.name}.`));
+  on('enchanted', r => say(`Enchanted ${r.item.icon} ${r.item.name}: ${r.enchant.icon} ${r.enchant.tierName} ${r.enchant.name} (${r.enchant.text}) for ${r.cost} gold.`));
   on('levelUp', r => say(`LEVEL UP! You are now level ${r.level}.`));
   on('heroDefeated', () => say('You have fallen...'));
   on('victory', () => say('The dungeon is conquered. You win!'));
@@ -314,14 +370,18 @@ function enterRoom(run, choice) {
     h.hp += hp; h.mp += mp;
     run.events.emit('rest', { hp, mp });
     run.phase = 'event';
+  } else if (door.type === 'enchant') {
+    run.phase = 'enchant';                                           // enchanter: spend gold on gear
   } else {
     run.phase = 'shop';                                              // merchant: buy potions, then leave
   }
 }
 
-// Leave a cleared room / treasure / campfire / merchant and go back to the door choice.
+// Leave a cleared room / treasure / campfire / merchant / enchanter and go back to the door choice.
 function leaveRoom(run) {
-  if (run.phase !== 'event' && run.phase !== 'shop') throw gameError('You cannot leave right now.');
+  if (run.phase !== 'event' && run.phase !== 'shop' && run.phase !== 'enchant') {
+    throw gameError('You cannot leave right now.');
+  }
   run.log = [];
   run.enemy = null; run.room = null;
   run.step++;
@@ -389,6 +449,9 @@ function answer(run, answers, now = Date.now()) {
   let correct = 0;
   if (!timedOut) p.solutions.forEach((s, i) => { if (Number.isInteger(given[i]) && given[i] === s) correct++; });
   const ratio = correct / p.n;
+  run.puzzleStats.attempted += p.n;
+  run.puzzleStats.solved += correct;                       // correct within the deadline only
+  if (ratio === 1) run.puzzleStats.perfectTurns++;
   run.events.emit('puzzleResult', { correct, total: p.n, timedOut });
 
   const hero = run.hero, enemy = run.enemy;
@@ -483,6 +546,32 @@ function buyPotion(run) {
   run.hero.potions++;
 }
 
+// ---------- Enchanter room view ----------
+// Lists every enchantment the player can buy right now plus the tier that is unlocked.
+function enchantingView(run) {
+  if (run.phase !== 'enchant') return null;
+  const h = run.hero;
+  const tier = availableEnchantTier(run);
+  const items = [...EQUIP_SLOTS.map(slot => h.equipment[slot]), ...h.inventory]
+    .filter(Boolean)
+    .map(item => ({
+      id: item.id, name: item.name, icon: item.icon, slot: item.slot, rarity: item.rarityLabel,
+      equipped: EQUIP_SLOTS.some(slot => h.equipment[slot] === item),
+      enchant: item.enchant || null
+    }));
+  return {
+    tier: tier && { ...tier },
+    next: ENCHANT_TIERS.find(t => !tier || t.tier === tier.tier + 1) || null,
+    gold: h.gold,
+    options: Object.entries(ENCHANTS).map(([key, def]) => ({
+      key, name: def.name, icon: def.icon, stat: def.stat, statLabel: STAT_LABELS[def.stat],
+      base: def.base, amount: def.base * (tier ? tier.mult : 1),
+      cost: tier ? tier.gold : null, affordable: Boolean(tier) && h.gold >= tier.gold
+    })),
+    items
+  };
+}
+
 // ---------- What the browser may see (never the solutions) ----------
 function view(run, now = Date.now()) {
   const h = run.hero, e = run.enemy;
@@ -494,7 +583,8 @@ function view(run, now = Date.now()) {
   const itemView = item => item && ({
     id: item.id, key: item.key, name: item.name, icon: item.icon, slot: item.slot,
     rarity: item.rarity, rarityLabel: item.rarityLabel, stats: item.stats,
-    statText: statText(item.stats), value: item.value
+    statText: statText(item.stats), value: item.value,
+    enchant: item.enchant || null
   });
   const equipment = {};
   for (const slot of EQUIP_SLOTS) equipment[slot] = itemView(run.hero.equipment[slot]);
@@ -516,6 +606,8 @@ function view(run, now = Date.now()) {
             base: { ...h.base }, bonus: equipmentBonus(h) },
     equipment,
     inventory: h.inventory.map(itemView),
+    puzzleStats: { ...run.puzzleStats },
+    enchanting: enchantingView(run),
     enemy: e ? { name: e.name, emoji: e.emoji, tier: e.tier, tierLabel: TIERS[e.tier].label,
                  hp: e.hp, maxHp: e.maxHp, nextMove: e.nextMove } : null,
     pending: run.pending ? { n: run.pending.n, msLeft: Math.max(0, run.pending.deadline - now) } : null,
@@ -523,6 +615,6 @@ function view(run, now = Date.now()) {
   };
 }
 
-module.exports = { createRun, startAction, answer, enterRoom, leaveRoom, buyPotion, equipItem, unequipItem, view, scoreOf,
-                   BESTIARY, DUNGEON, TIERS, ACTIONS, ITEMS, RARITIES, EQUIP_SLOTS, LOOT_BY_TIER,
+module.exports = { createRun, startAction, answer, enterRoom, leaveRoom, buyPotion, equipItem, unequipItem, enchantItem, view, scoreOf,
+                   BESTIARY, DUNGEON, TIERS, ACTIONS, ITEMS, RARITIES, EQUIP_SLOTS, LOOT_BY_TIER, ENCHANTS, ENCHANT_TIERS,
                    POTION_PRICE, GRACE_MS };

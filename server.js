@@ -224,6 +224,13 @@ const routes = {
     send(res, 200, { run: game.view(run) });
   } },
 
+  // Enchanter: spend gold to add (or replace) one enchantment on an equipped or bagged item.
+  'POST /api/run/enchant': { auth: true, handler: async (ctx, res) => {
+    const run = requireRun(ctx);
+    game.enchantItem(run, ctx.body.itemId, String(ctx.body.enchantKey));
+    send(res, 200, { run: game.view(run) });
+  } },
+
   // Dungeon navigation: pick one of the doors offered on the map, and leave a room when done.
   'POST /api/run/door': { auth: true, handler: async (ctx, res) => {
     const run = requireRun(ctx);

@@ -114,7 +114,7 @@ button.link {
   font-size: .86rem; font-weight: 650;
 }
 button.link:hover { text-decoration: underline; }
-button:focus-visible, input:focus-visible, [tabindex]:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
+button:focus-visible, input:focus-visible, select:focus-visible, [tabindex]:focus-visible { outline: 3px solid #fff; outline-offset: 2px; }
 input {
   width: 100%; padding: 12px 13px; font: inherit; color: inherit;
   background: #00000038; border: 1px solid var(--line); border-radius: 11px;
@@ -374,6 +374,34 @@ button.door span { font-weight: 400; color: var(--muted); font-size: .84rem; }
 .bag-item.rarity-rare { border-color: #4d8dff50; }
 .bag-item.rarity-epic { border-color: #b45cff60; }
 
+/* ---------- Enchanter ---------- */
+#enchant-card h2 { margin: 0; }
+#enchant-tier.is-on { color: var(--accent); border-color: #f5b70066; background: #f5b70014; }
+#enchant-hint { margin: 6px 0 12px; font-size: .88rem; }
+.enchant-list { display: grid; gap: 8px; margin-bottom: 12px; }
+.enchant-item {
+  display: flex; flex-direction: column; gap: 6px;
+  padding: 10px; border: 1px solid #ffffff0d; border-radius: 11px; background: #00000020;
+}
+.enchant-head { display: flex; align-items: center; gap: 8px; flex-wrap: wrap; }
+.enchant-head .rarity-tag { margin-top: 0; margin-left: auto; }
+.equip-badge {
+  font-size: .62rem; font-weight: 800; text-transform: uppercase; letter-spacing: .08em;
+  padding: 2px 7px; border-radius: 999px; color: var(--accent);
+  border: 1px solid #f5b70055; background: #f5b70012;
+}
+.enchant-line { font-size: .76rem; color: #c9a7ff; }
+.enchant-controls { display: flex; gap: 8px; flex-wrap: wrap; }
+.enchant-select {
+  flex: 1 1 240px; min-width: 0; padding: 8px 10px; font: inherit; font-size: .84rem;
+  color: var(--fg); background: #00000038; border: 1px solid var(--line); border-radius: 9px;
+}
+.enchant-controls button { white-space: nowrap; }
+.enchant-item.rarity-uncommon { border-color: #5fd97f40; }
+.enchant-item.rarity-rare { border-color: #4d8dff50; }
+.enchant-item.rarity-epic { border-color: #b45cff60; }
+#enchant-leave-btn { margin-top: 2px; }
+
 /* ---------- Toast ---------- */
 #message {
   position: fixed; left: 50%; bottom: 22px; z-index: 40; transform: translateX(-50%);
@@ -417,6 +445,8 @@ button.door span { font-weight: 400; color: var(--muted); font-size: .84rem; }
   .equip-slots { grid-template-columns: 1fr; }
   .bag-item { grid-template-columns: minmax(0, 1fr) auto; }
   .bag-item .rarity-tag { display: none; }
+  .enchant-controls { flex-direction: column; }
+  .enchant-controls button { width: 100%; }
   .page-head { align-items: flex-start; }
   .head-actions { width: 100%; }
   .head-actions button { flex: 1; }

@@ -445,6 +445,9 @@ function render() {
   const gear = [['atk', 'ATK'], ['def', 'DEF'], ['maxHp', 'HP'], ['maxMp', 'MP']]
     .filter(([k]) => bonus[k]).map(([k, label]) => `+${bonus[k]} ${label}`);
   $('hero-gear').textContent = gear.length ? `Gear bonus: ${gear.join(', ')}` : 'Gear bonus: none equipped';
+  const ps = run.puzzleStats || { solved: 0, attempted: 0 };
+  $('hero-puzzles').textContent = `🍌 Solved in time: ${ps.solved}/${ps.attempted} puzzles` +
+    (ps.perfectTurns ? ` · ${ps.perfectTurns} perfect turn${ps.perfectTurns === 1 ? '' : 's'}` : '');
 
   const combat = run.phase === 'combat';
   show('actions', combat);
@@ -461,6 +464,9 @@ function render() {
   $('buy-btn').textContent = `Buy potion (${run.potionPrice} 🪙)`;
   $('buy-btn').disabled = busy || h.gold < run.potionPrice;
   $('leave-btn').disabled = busy;
+
+  show('enchant-card', run.phase === 'enchant');
+  if (run.phase === 'enchant') renderEnchanter(run);
 
   show('event-card', run.phase === 'event');
   if (run.phase === 'event') {
@@ -514,6 +520,7 @@ function renderEquipment(run) {
         el('span', 'slot-tag', label),
         el('span', 'item-line', `${item.icon} ${item.name}`),
         el('span', 'item-stats', itemStatsText(item)),
+        ...(item.enchant ? [el('span', 'enchant-line', enchantTag(item))] : []),
         el('span', 'rarity-tag', item.rarityLabel)
       );
       card.addEventListener('click', () => changeEquipment('unequip', { slot }));
@@ -534,7 +541,8 @@ function renderEquipment(run) {
     const main = el('div', 'bag-main');
     main.append(
       el('span', 'item-line', `${item.icon} ${item.name}`),
-      el('span', 'item-stats', itemStatsText(item))
+      el('span', 'item-stats', itemStatsText(item)),
+      ...(item.enchant ? [el('span', 'enchant-line', enchantTag(item))] : [])
     );
     const action = el('button', 'small equip-btn', `Equip · ${SLOT_LABELS[item.slot]}`);
     action.type = 'button';
@@ -549,6 +557,73 @@ function changeEquipment(kind, payload) {
   guarded(async () => {
     setMessage('');
     run = (await api('/api/run/' + kind, 'POST', payload)).run;
+  });
+}
+
+// ---------- Enchanter panel ----------
+function enchantTag(item) {
+  const e = item && item.enchant;
+  return e ? `${e.icon} ${e.tierName} ${e.name} (${e.text})` : '';
+}
+
+function renderEnchanter(run) {
+  const info = run.enchanting;
+  if (!info) return;
+  const tier = info.tier;
+  const ps = run.puzzleStats || { solved: 0 };
+  const pill = $('enchant-tier');
+  pill.textContent = tier ? `${tier.name} tier` : 'Locked';
+  pill.className = 'pill' + (tier ? ' is-on' : '');
+
+  const hint = $('enchant-hint');
+  if (!tier) {
+    hint.textContent = `Solve ${info.next.solved} puzzles in time to unlock enchanting. You have solved ${ps.solved}.`;
+  } else {
+    hint.textContent = `Each enchantment costs ${tier.gold} gold. ` + (info.next
+      ? `Solve ${info.next.solved} puzzles in time to reach ${info.next.name} tier (you have ${ps.solved}).`
+      : `You have reached the highest tier (${ps.solved} solved).`);
+  }
+
+  const list = $('enchant-list');
+  list.textContent = '';
+  if (!info.items.length) {
+    list.appendChild(el('p', 'empty', 'You have no gear to enchant. Find some loot first.'));
+    return;
+  }
+  info.items.forEach(item => {
+    const row = el('div', 'enchant-item rarity-' + String(item.rarity || '').toLowerCase());
+    const head = el('div', 'enchant-head');
+    head.append(el('span', 'item-line', `${item.icon} ${item.name}`));
+    if (item.equipped) head.appendChild(el('span', 'equip-badge', 'Equipped'));
+    head.appendChild(el('span', 'rarity-tag', item.rarity || ''));
+    row.appendChild(head);
+    row.appendChild(el('span', 'item-stats', enchantTag(item) || 'No enchantment yet'));
+
+    const controls = el('div', 'enchant-controls');
+    const select = el('select', 'enchant-select');
+    select.setAttribute('aria-label', `Enchantment for ${item.name}`);
+    select.disabled = busy || !tier;
+    info.options.forEach(o => {
+      const opt = el('option', '', `${o.icon} ${o.name} · +${o.amount} ${o.statLabel} · ${o.cost} 🪙`);
+      opt.value = o.key;
+      select.appendChild(opt);
+    });
+    const btn = el('button', 'small', tier ? `Enchant · ${tier.gold} 🪙` : 'Locked');
+    btn.type = 'button';
+    btn.disabled = busy || !tier || run.hero.gold < tier.gold;
+    btn.addEventListener('click', () => enchantGear(item.id, select.value));
+    controls.append(select, btn);
+    row.appendChild(controls);
+    list.appendChild(row);
+  });
+}
+
+function enchantGear(itemId, enchantKey) {
+  if (!enchantKey) return;
+  guarded(async () => {
+    setMessage('');
+    run = (await api('/api/run/enchant', 'POST', { itemId, enchantKey })).run;
+    setMessage('Enchantment applied.', 'ok');
   });
 }
 
@@ -676,11 +751,12 @@ document.querySelectorAll('#actions button').forEach(b => b.addEventListener('cl
 
 $('buy-btn').addEventListener('click', () => guarded(async () => { run = (await api('/api/run/shop', 'POST', {})).run; }));
 $('leave-btn').addEventListener('click', leaveRoom);       // leave the merchant
+$('enchant-leave-btn').addEventListener('click', leaveRoom); // leave the enchanter
 $('continue-btn').addEventListener('click', leaveRoom);    // leave a cleared room / treasure / campfire
 
 // Keyboard events: digits fill the next empty puzzle slot; Enter submits; A/S/H/D/P pick actions.
 document.addEventListener('keydown', e => {
-  if (e.target.tagName === 'INPUT' || e.ctrlKey || e.metaKey || e.altKey) return;
+  if (e.target.tagName === 'INPUT' || e.target.tagName === 'SELECT' || e.ctrlKey || e.metaKey || e.altKey) return;
   if (currentView !== 'battle' || !run) return;
   if (!$('puzzle-card').hidden) {
     if (/^[0-9]$/.test(e.key)) { const i = answers.findIndex(a => a === null); pick(i === -1 ? answers.length - 1 : i, Number(e.key)); }
@@ -688,7 +764,7 @@ document.addEventListener('keydown', e => {
     return;
   }
   if (run.phase === 'map' && /^[1-2]$/.test(e.key)) return chooseDoor(Number(e.key) - 1);     // 1/2 = doors
-  if ((run.phase === 'event' || run.phase === 'shop') && e.key === 'Enter') return leaveRoom();
+  if ((run.phase === 'event' || run.phase === 'shop' || run.phase === 'enchant') && e.key === 'Enter') return leaveRoom();
   if (e.key.toLowerCase() === 'b') { bagOpen = !bagOpen; render(); return; }                 // B = bag
   const map = { a: 'attack', s: 'skill', h: 'heal', d: 'defend', p: 'potion' };
   const btn = map[e.key.toLowerCase()] && document.querySelector(`#actions button[data-action="${map[e.key.toLowerCase()]}"]`);

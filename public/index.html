@@ -208,7 +208,7 @@
 
     <div class="card" id="map-card" hidden>
       <h2>Choose a door</h2>
-      <p class="muted">One door always leads to a fight. The other could be treasure, a campfire or a merchant.</p>
+      <p class="muted">One door always leads to a fight. The other could be treasure, a campfire, a merchant or an enchanter.</p>
       <div id="doors" class="grid"></div>
     </div>
 
@@ -231,6 +231,7 @@
       <div class="stat"><span>XP</span><div class="bar"><div id="hero-xp" class="fill xp"></div></div><span id="hero-xp-text"></span></div>
       <p class="muted" id="hero-extra"></p>
       <p class="muted tiny" id="hero-gear"></p>
+      <p class="muted tiny" id="hero-puzzles"></p>
     </div>
 
     <div class="card" id="puzzle-card" hidden>
@@ -253,6 +254,16 @@
         <button type="button" id="buy-btn" class="ghost"></button>
         <button type="button" id="leave-btn">Leave shop →</button>
       </div>
+    </div>
+
+    <div class="card" id="enchant-card" hidden>
+      <div class="row between">
+        <h2>🔮 The Enchanter</h2>
+        <span id="enchant-tier" class="pill"></span>
+      </div>
+      <p class="muted" id="enchant-hint"></p>
+      <div id="enchant-list" class="enchant-list"></div>
+      <button type="button" id="enchant-leave-btn" class="ghost">Leave enchanter →</button>
     </div>
 
     <div class="card" id="event-card" hidden>

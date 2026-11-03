@@ -334,6 +334,230 @@ test('equipment changes are rejected for bad ids/slots and while a puzzle is pen
   run.phase = 'over';
   assert.throws(() => game.unequipItem(run, 'weapon'), /run is over/);
 });
+
+// ---------- Enchantments ----------
+// Walk into a forced enchanter room with a chosen amount of gold and solved puzzles.
+function inEnchant(gold = 0, solved = 0) {
+  const run = game.createRun('u', rng);
+  run.map[0][0] = { type: 'enchant' };
+  game.enterRoom(run, 0);
+  run.hero.gold = gold;
+  run.puzzleStats.solved = solved;
+  return run;
+}
+const testItem = (id, over = {}) => ({
+  id, key: 'short_sword', name: 'Short Sword', icon: '⚔️', slot: 'weapon',
+  rarity: 'common', rarityLabel: 'Common', stats: { atk: 4 }, value: 25, ...over
+});
+
+test('puzzle stats count only correct answers given before the deadline', async () => {
+  const run = inFight('Slime');
+  run.enemy.hp = 999;
+  await game.startAction(run, 'attack', SOURCE);
+  game.answer(run, [7]);
+  assert.deepStrictEqual(run.puzzleStats, { solved: 1, attempted: 1, perfectTurns: 1 });
+
+  await game.startAction(run, 'attack', SOURCE, 1000);
+  game.answer(run, [7], 1000 + 20000 + game.GRACE_MS + 1);   // too late: no credit
+  assert.deepStrictEqual(run.puzzleStats, { solved: 1, attempted: 2, perfectTurns: 1 });
+  assert.deepStrictEqual(game.view(run).puzzleStats, { solved: 1, attempted: 2, perfectTurns: 1 });
+});
+
+test('enchanter room opens and closes; tiers unlock from puzzles solved in time', () => {
+  const run = inEnchant(1000, 0);
+  assert.strictEqual(run.phase, 'enchant');
+  let v = game.view(run);
+  assert.strictEqual(v.room.type, 'enchant');
+  assert.strictEqual(v.enchanting.tier, null);
+  assert.strictEqual(v.enchanting.next.name, 'Lesser');
+  assert.strictEqual(v.enchanting.options.length, Object.keys(game.ENCHANTS).length);
+  assert.strictEqual(v.enchanting.options[0].cost, null);
+  assert.throws(() => game.enchantItem(run, 1, 'sharp'), /Solve 3 puzzles/);
+
+  run.puzzleStats.solved = 3;
+  v = game.view(run);
+  assert.strictEqual(v.enchanting.tier.name, 'Lesser');
+  assert.strictEqual(v.enchanting.tier.gold, 20);
+  assert.strictEqual(v.enchanting.options[0].amount, game.ENCHANTS.sharp.base);
+
+  run.puzzleStats.solved = 8;
+  assert.strictEqual(game.view(run).enchanting.tier.name, 'Greater');
+  run.puzzleStats.solved = 25;
+  v = game.view(run);
+  assert.strictEqual(v.enchanting.tier.name, 'Mythic');
+  assert.strictEqual(v.enchanting.next, null);
+  assert.strictEqual(v.enchanting.options[0].amount, game.ENCHANTS.sharp.base * 4);
+
+  game.leaveRoom(run);
+  assert.strictEqual(run.phase, 'map');
+  assert.strictEqual(game.view(run).enchanting, null);
+});
+
+test('enchanting equipped gear costs gold, boosts stats immediately and replaces the old enchantment', () => {
+  const run = inEnchant(100, 3);
+  const h = run.hero;
+  const sword = testItem(201);
+  h.inventory.push(sword);
+  game.equipItem(run, 201);
+  const atk = h.atk;
+
+  game.enchantItem(run, 201, 'sharp');
+  assert.strictEqual(h.gold, 80);
+  assert.strictEqual(h.atk, atk + 2);
+  assert.deepStrictEqual(sword.enchant.stats, { atk: 2 });
+  assert.strictEqual(sword.enchant.tierName, 'Lesser');
+  assert.ok(run.log.some(l => /Enchanted .*Lesser Sharpened/.test(l)));
+
+  game.enchantItem(run, 201, 'vital');                       // one enchantment per item: replaces
+  assert.strictEqual(h.gold, 60);
+  assert.strictEqual(h.atk, atk);                            // sharp bonus is gone, not stacked
+  assert.strictEqual(h.maxHp, 60 + 8);
+  const v = game.view(run);
+  assert.strictEqual(v.equipment.weapon.enchant.name, 'Vital');
+  assert.strictEqual(v.equipment.weapon.enchant.text, '+8 HP');
+});
+
+test('enchanting a bagged item does not change stats until it is equipped', () => {
+  const run = inEnchant(50, 3);
+  const h = run.hero;
+  const ring = testItem(301, { key: 'lucky_charm', name: 'Lucky Charm', icon: '🍀', slot: 'trinket', stats: { maxMp: 5 }, value: 18 });
+  h.inventory.push(ring);
+  const maxMp = h.maxMp;
+
+  game.enchantItem(run, 301, 'arcane');
+  assert.strictEqual(h.gold, 30);
+  assert.strictEqual(h.maxMp, maxMp);                        // still in the bag
+  assert.strictEqual(game.view(run).inventory[0].enchant.name, 'Arcane');
+
+  game.equipItem(run, 301);
+  assert.strictEqual(h.maxMp, maxMp + 5 + 4);                // gear + enchantment now apply
+});
+
+test('higher tiers scale the bonus and cost; bad requests are rejected', () => {
+  const run = inEnchant(200, 8);
+  const h = run.hero;
+  const armor = testItem(401, { key: 'leather_armor', name: 'Leather Armor', icon: '🥋', slot: 'armor', stats: { def: 2, maxHp: 10 } });
+  h.inventory.push(armor);
+
+  game.enchantItem(run, 401, 'warded');
+  assert.strictEqual(h.gold, 155);                           // Greater costs 45
+  assert.deepStrictEqual(armor.enchant.stats, { def: 4 });   // base 2 x tier 2
+  assert.strictEqual(armor.enchant.tierName, 'Greater');
+  assert.strictEqual(h.def, 2);                              // still in the bag, so base DEF only
+
+  assert.throws(() => game.enchantItem(run, 999, 'sharp'), /not in your equipment or bag/);
+  assert.throws(() => game.enchantItem(run, 401, 'fire'), /Unknown enchantment/);
+
+  run.phase = 'map';
+  assert.throws(() => game.enchantItem(run, 401, 'sharp'), /find an enchanter/);
+});
+
+test('enchanting needs enough gold and no pending puzzle', () => {
+  const run = inEnchant(10, 3);
+  const h = run.hero;
+  h.inventory.push(testItem(501));
+  assert.throws(() => game.enchantItem(run, 501, 'sharp'), /Not enough gold/);
+  h.gold = 100;
+  run.pending = { n: 1 };
+  assert.throws(() => game.enchantItem(run, 501, 'sharp'), /Finish the current puzzle/);
+  run.pending = null;
+  game.enchantItem(run, 501, 'sharp');
+  assert.strictEqual(h.gold, 80);
+});
+// ---------- Equipment & loot ----------
+test('bosses always drop from their own loot table; rarity scales the stats', async () => {
+  const run = inFight('Ancient Dragon');
+  run.enemy.hp = 1;
+  await game.startAction(run, 'attack', SOURCE);
+  game.answer(run, [7, 7, 7]);
+  assert.strictEqual(run.hero.inventory.length, 1);                 // boss drop chance is 100%
+  const item = run.hero.inventory[0];
+  assert.strictEqual(item.key, 'dragonscale');                      // rng 0.5 picks the middle entry
+  assert.strictEqual(item.rarity, 'rare');
+  assert.deepStrictEqual(item.stats, { def: 11, maxHp: 53 });       // base 6/30 * rare 1.75
+  const v = game.view(run);
+  assert.strictEqual(v.inventory.length, 1);
+  assert.strictEqual(v.inventory[0].rarityLabel, 'Rare');
+  assert.strictEqual(v.inventory[0].statText, '+11 DEF, +53 HP');
+  assert.strictEqual(v.equipment.weapon, null);
+  assert.ok(v.log.some(l => /Loot! .*Dragonscale/.test(l)));
+});
+
+test('mob drops are chance-based and come from that enemy, not the tier fallback', async () => {
+  const lucky = () => 0;                                            // every roll succeeds, common rarity
+  const run = game.createRun('u', lucky);
+  const i = run.map[0].findIndex(d => d.type === 'combat');
+  run.map[0][i] = { type: 'combat', enemy: 'Slime' };
+  game.enterRoom(run, i);
+  run.enemy.hp = 1;
+  await game.startAction(run, 'attack', SOURCE);
+  game.answer(run, [7]);
+  assert.strictEqual(run.hero.inventory.length, 1);
+  assert.strictEqual(run.hero.inventory[0].key, 'cloth_vest');      // Slime's own table
+  assert.strictEqual(run.hero.inventory[0].rarity, 'common');
+
+  const unlucky = inFight('Slime');                                 // rng 0.5 > 35% drop chance
+  unlucky.enemy.hp = 1;
+  await game.startAction(unlucky, 'attack', SOURCE);
+  game.answer(unlucky, [7]);
+  assert.strictEqual(unlucky.hero.inventory.length, 0);
+});
+
+test('equipping gear adds stats, swapping stows the old item, unequipping removes the bonus', () => {
+  const run = inFight('Slime');
+  const h = run.hero;
+  h.inventory.push(
+    { id: 101, key: 'short_sword', name: 'Short Sword', icon: '⚔️', slot: 'weapon', rarity: 'common', rarityLabel: 'Common', stats: { atk: 4 }, value: 25 },
+    { id: 102, key: 'iron_axe', name: 'Iron Axe', icon: '🪓', slot: 'weapon', rarity: 'rare', rarityLabel: 'Rare', stats: { atk: 12 }, value: 79 },
+    { id: 103, key: 'leather_armor', name: 'Leather Armor', icon: '🥋', slot: 'armor', rarity: 'common', rarityLabel: 'Common', stats: { def: 2, maxHp: 10 }, value: 30 }
+  );
+  const atk = h.atk, def = h.def, maxHp = h.maxHp, hp = h.hp;
+
+  game.equipItem(run, 101);
+  assert.strictEqual(h.equipment.weapon.name, 'Short Sword');
+  assert.strictEqual(h.atk, atk + 4);
+  assert.strictEqual(h.inventory.length, 2);
+
+  game.equipItem(run, 102);                                         // swap the slot
+  assert.strictEqual(h.equipment.weapon.name, 'Iron Axe');
+  assert.strictEqual(h.atk, atk + 12);                              // not atk + 4 + 12
+  assert.ok(h.inventory.some(i => i.name === 'Short Sword'));
+
+  game.equipItem(run, 103);                                         // armor also raises the cap and current HP
+  assert.strictEqual(h.maxHp, maxHp + 10);
+  assert.strictEqual(h.hp, hp + 10);
+  assert.strictEqual(h.def, def + 2);
+
+  game.unequipItem(run, 'weapon');
+  assert.strictEqual(h.equipment.weapon, null);
+  assert.strictEqual(h.atk, atk);
+  game.unequipItem(run, 'armor');
+  assert.strictEqual(h.maxHp, maxHp);
+  assert.strictEqual(h.hp, hp);                                     // clamped back down
+  assert.strictEqual(h.def, def);
+  assert.strictEqual(h.inventory.length, 3);
+
+  const v = game.view(run);
+  assert.deepStrictEqual(v.hero.bonus, { atk: 0, def: 0, maxHp: 0, maxMp: 0 });
+  assert.strictEqual(v.inventory.length, 3);
+});
+
+test('equipment changes are rejected for bad ids/slots and while a puzzle is pending', async () => {
+  const run = inFight('Slime');
+  assert.throws(() => game.equipItem(run, 999), /not in your inventory/);
+  assert.throws(() => game.unequipItem(run, 'hat'), /Unknown equipment slot/);
+  assert.throws(() => game.unequipItem(run, 'weapon'), /Nothing is equipped/);
+
+  run.hero.inventory.push({ id: 7, name: 'Rusty Dagger', icon: '🗡️', slot: 'weapon', rarity: 'common', rarityLabel: 'Common', stats: { atk: 2 }, value: 12 });
+  await game.startAction(run, 'attack', SOURCE);
+  assert.throws(() => game.equipItem(run, 7), /Finish the current puzzle/);
+  game.answer(run, [7]);
+  game.equipItem(run, 7);
+  assert.strictEqual(run.hero.equipment.weapon.name, 'Rusty Dagger');
+
+  run.phase = 'over';
+  assert.throws(() => game.unequipItem(run, 'weapon'), /run is over/);
+});
 // ---------- HTTP integration tests ----------
 let base, server, cookie = '';
 
@@ -486,8 +710,33 @@ test('http: run view exposes equipment and the equip/unequip routes validate inp
   assert.deepStrictEqual(Object.keys(v.equipment).sort(), ['armor', 'trinket', 'weapon']);
   assert.deepStrictEqual(v.inventory, []);
   assert.deepStrictEqual(v.hero.bonus, { atk: 0, def: 0, maxHp: 0, maxMp: 0 });
+  assert.deepStrictEqual(v.puzzleStats, { solved: 0, attempted: 0, perfectTurns: 0 });
+  assert.strictEqual(v.enchanting, null);
   assert.strictEqual((await call('/api/run/equip', 'POST', { itemId: 999 })).status, 400);
   assert.strictEqual((await call('/api/run/equip', 'POST', {})).status, 400);
   assert.strictEqual((await call('/api/run/unequip', 'POST', { slot: 'weapon' })).status, 400);
   assert.strictEqual((await call('/api/run/unequip', 'POST', { slot: 'hat' })).status, 400);
+});
+
+test('http: enchanter room is exposed and the enchant route validates state', async () => {
+  await call('/api/run/new', 'POST');
+  assert.strictEqual((await call('/api/run/enchant', 'POST', { itemId: 1, enchantKey: 'sharp' })).status, 400);
+
+  // Enchanter doors are random, so start runs until one is offered.
+  let entered = null;
+  for (let attempt = 0; attempt < 50 && !entered; attempt++) {
+    await call('/api/run/new', 'POST');
+    const run = (await call('/api/run')).body.run;
+    const idx = run.map.doors.findIndex(d => d.type === 'enchant');
+    if (idx >= 0) entered = await call('/api/run/door', 'POST', { choice: idx });
+  }
+  assert.ok(entered, 'an enchanter door should eventually be generated');
+  assert.strictEqual(entered.body.run.phase, 'enchant');
+  assert.strictEqual(entered.body.run.room.type, 'enchant');
+  assert.strictEqual(entered.body.run.enchanting.tier, null);
+  assert.strictEqual(entered.body.run.enchanting.options.length, 4);
+
+  assert.strictEqual((await call('/api/run/enchant', 'POST', { itemId: 1, enchantKey: 'sharp' })).status, 400);
+  assert.strictEqual((await call('/api/run/enchant', 'POST', { itemId: 1, enchantKey: 'fire' })).status, 400);
+  assert.strictEqual((await call('/api/run/leave', 'POST')).status, 200);
 });

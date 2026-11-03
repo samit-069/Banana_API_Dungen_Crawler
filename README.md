@@ -10,7 +10,7 @@ Needs **Node.js 18+** only. There are **no npm dependencies**, so no `npm instal
 
 ```bash
 node server.js      # or: npm start      -> http://localhost:3000
-npm test            # 27 tests, uses a fake Banana API, works offline
+npm test            # 34 tests, uses a fake Banana API, works offline
 ```
 
 Optional env vars: `PORT` (3000), `BANANA_API` (override API URL), `DATA_DIR` (where users.json is stored).
@@ -19,10 +19,10 @@ Optional env vars: `PORT` (3000), `BANANA_API` (override API URL), `DATA_DIR` (w
 
 Register, then start an adventure in **The Banana Crypt**: 3 floors, each made of 3 rooms plus a floor boss.
 Between rooms you choose one of two doors. A fight is always on offer; the other door may be another fight,
-💰 treasure, 🔥 a campfire (heals you) or 🛒 a merchant (buys potions). Doors show what is behind them, so you
-decide when to fight for XP and when to heal. Floor 1 ends with a mid-boss, floor 2 with a mid-boss, floor 3 with the dragon.
-Each combat turn you pick an action; puzzle actions show Banana puzzle images and a countdown.
-Keyboard: 1/2 choose a door, Enter continues.
+💰 treasure, 🔥 a campfire (heals you), 🛒 a merchant (buys potions) or 🔮 an enchanter (spends gold on gear magic).
+Doors show what is behind them, so you decide when to fight for XP and when to heal. Floor 1 ends with a mid-boss,
+floor 2 with a mid-boss, floor 3 with the dragon. Each combat turn you pick an action; puzzle actions show Banana
+puzzle images and a countdown. Keyboard: 1/2 choose a door, Enter continues or leaves a room.
 
 **Screens.** After logging in you land on the **dashboard**: avatar, title, six career stats (best score, wins,
 runs, rooms cleared, lifetime gold, global rank), your last four runs and a top-five leaderboard. The
@@ -59,11 +59,26 @@ three slots — **weapon**, **armor**, **trinket** — and is managed from the �
 double-counts; equipping armour also grants the extra HP immediately. Equipment belongs to the current run and is
 reset with a new adventure.
 
+**Enchantments.** An **Enchanter** room can appear behind a door. The tier of magic you can buy depends on how many
+Banana puzzles you answered correctly *before the deadline* during the current run:
+
+| Tier | Puzzles solved in time | Cost per enchantment | Stat multiplier |
+| --- | --- | --- | --- |
+| Lesser | 3 | 20 gold | x1 |
+| Greater | 8 | 45 gold | x2 |
+| Superior | 15 | 80 gold | x3 |
+| Mythic | 25 | 140 gold | x4 |
+
+Four enchantments exist — Sharpened (ATK), Warded (DEF), Vital (max HP) and Arcane (max MP). Each item holds **one**
+enchantment; enchanting it again replaces the old one. Enchanting equipped gear recalculates your stats immediately;
+enchanting something in the bag only takes effect when you equip it. Timed-out answers earn no puzzle credit, so the
+strongest enchantments reward accurate play under pressure. The hero panel tracks `solved / attempted` puzzles.
+
 ## Files
 
 | File | Role |
 | --- | --- |
-| `game.js` | RPG engine: dungeon/floor/room generation, combat, loot/equipment rules, bestiary data. No I/O, emits events, fully unit-tested |
+| `game.js` | RPG engine: dungeon/floor/room generation, combat, loot/equipment/enchantment rules, bestiary data. No I/O, emits events, fully unit-tested |
 | `banana.js` | Client for the Banana API (the interoperability layer) |
 | `server.js` | HTTP server (Node built-ins only): routes, auth, sessions, static files |
 | `store.js` | JSON-file user profiles, run history and score storage (MVP) |
@@ -87,6 +102,7 @@ reset with a new adventure.
 | `POST /api/run/shop` | yes | Buy a potion from the merchant |
 | `POST /api/run/equip` | yes | Equip `{ itemId }` from the bag (swaps the slot back into the bag) |
 | `POST /api/run/unequip` | yes | Unequip `{ slot }` (`weapon` / `armor` / `trinket`) |
+| `POST /api/run/enchant` | yes | Enchant `{ itemId, enchantKey }` at an enchanter (costs gold; replaces any existing enchantment) |
 
 ## The four video themes in this code
 
